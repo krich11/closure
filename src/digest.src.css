@@ -65,6 +65,20 @@
   /* ── Actions Bar ──────────────────────────────────────────────── */
   .actions-bar {
     @apply flex justify-between items-center mb-10;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .ai-hint {
+    @apply text-xs text-ink-muted w-full mt-1;
+  }
+
+  .ai-hint a {
+    @apply text-warm underline;
+  }
+
+  .ai-hint a:hover {
+    @apply no-underline;
   }
 
   .filter-controls {

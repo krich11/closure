@@ -183,9 +183,12 @@ function setupEventListeners() {
 
   // Cluster button — enable when window.ai is available
   const clusterBtn = document.getElementById('cluster-btn');
+  const aiHint = document.getElementById('ai-hint');
+  const aiHintLink = document.getElementById('ai-hint-link');
   if (clusterBtn) {
     if (typeof window.ai !== 'undefined' && window.ai) {
       clusterBtn.disabled = false;
+      if (aiHint) aiHint.hidden = true;
       clusterBtn.addEventListener('click', async () => {
         clusterBtn.disabled = true;
         clusterBtn.textContent = 'Clustering...';
@@ -196,6 +199,15 @@ function setupEventListeners() {
           clusterBtn.textContent = 'Clustering failed';
         }
       });
+    } else {
+      // Show the AI hint when window.ai is unavailable
+      if (aiHint) aiHint.hidden = false;
+      if (aiHintLink) {
+        aiHintLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          chrome.tabs.create({ url: chrome.runtime.getURL('settings/settings.html') });
+        });
+      }
     }
   }
 }

@@ -107,7 +107,10 @@ function applyHighContrast(enabled) {
 
 async function checkAiAvailability() {
   const statusEl = document.getElementById('ai-status');
+  const guideEl = document.getElementById('ai-setup-guide');
   if (!statusEl) return;
+
+  let aiAvailable = false;
 
   try {
     if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
@@ -115,8 +118,9 @@ async function checkAiAvailability() {
       if (capabilities.available === 'readily') {
         statusEl.textContent = 'On-device AI is available and ready.';
         statusEl.className = 'ai-status ai-status--available';
+        aiAvailable = true;
       } else if (capabilities.available === 'after-download') {
-        statusEl.textContent = 'On-device AI model needs to download first.';
+        statusEl.textContent = 'On-device AI model is available but needs to download first. Visit chrome://components to trigger the download.';
         statusEl.className = 'ai-status ai-status--pending';
       } else {
         statusEl.textContent = 'On-device AI is not available. Summaries will use fallback text.';
@@ -129,6 +133,11 @@ async function checkAiAvailability() {
   } catch {
     statusEl.textContent = 'Could not check AI status. Summaries will use fallback text.';
     statusEl.className = 'ai-status ai-status--unavailable';
+  }
+
+  // Show or hide the setup guide
+  if (guideEl) {
+    guideEl.hidden = aiAvailable;
   }
 }
 

@@ -140,6 +140,47 @@
     @apply text-ink-muted;
   }
 
+  /* ── AI Setup Guide ──────────────────────────────────────────── */
+  .ai-setup-guide {
+    @apply mt-3 rounded text-sm;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+  }
+
+  .ai-setup-summary {
+    @apply cursor-pointer py-2 px-3 font-medium text-warm;
+  }
+
+  .ai-setup-summary:hover {
+    text-decoration: underline;
+  }
+
+  .ai-setup-steps {
+    @apply px-4 pb-4;
+  }
+
+  .ai-setup-steps p {
+    @apply text-ink-secondary text-xs leading-relaxed mb-2;
+  }
+
+  .ai-setup-steps ol {
+    @apply list-decimal pl-5 text-xs leading-relaxed;
+    color: var(--color-ink);
+  }
+
+  .ai-setup-steps ol li {
+    @apply mb-2;
+  }
+
+  .ai-setup-steps code {
+    @apply text-warm font-mono text-xs px-1 rounded;
+    background: color-mix(in srgb, var(--color-warm) 10%, var(--color-bg));
+  }
+
+  .ai-setup-note {
+    @apply mt-3 text-xs italic text-ink-muted;
+  }
+
   /* ── Whitelist ────────────────────────────────────────────────── */
   .whitelist-input-row {
     @apply flex gap-2;
