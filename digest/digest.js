@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Sunday Digest (digest.js)
- * @version 1.3.1
+ * @version 1.3.2
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -235,7 +235,7 @@ async function isAiAvailable() {
       return availability === 'available' || availability === 'readily';
     }
     if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
-      const capabilities = await window.ai.languageModel.capabilities();
+      const capabilities = await window.ai.languageModel.capabilities({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
       return capabilities.available === 'readily';
     }
   } catch { /* ignore */ }
@@ -250,7 +250,7 @@ async function createAiSession() {
     return await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
   }
   if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
-    return await window.ai.languageModel.create();
+    return await window.ai.languageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
   }
   throw new Error('AI not available');
 }

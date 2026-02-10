@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.3.1
+ * @version 1.3.2
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -196,7 +196,7 @@ async function checkAiAvailability() {
       }
     } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
       // Legacy API fallback
-      const capabilities = await window.ai.languageModel.capabilities();
+      const capabilities = await window.ai.languageModel.capabilities({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
       if (capabilities.available === 'readily') {
         statusEl.textContent = 'On-device AI is available and ready.';
         statusEl.className = 'ai-status ai-status--available';

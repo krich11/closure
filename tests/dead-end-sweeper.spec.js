@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Dead End Sweeper Tests
- * @version 1.3.1
+ * @version 1.3.2
  *
  * Verifies that the Dead End Sweeper correctly detects error pages,
  * logs them to storage, closes them, and updates the badge.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.3.1
+ * @version 1.3.2
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -206,12 +206,17 @@ async function findExistingGroup(domain) {
  * When “overnight only” is enabled, the alarm itself is scheduled at
  * 2 AM daily, so no runtime hour check is needed here.
  */
-async function runTopicGrouping() {
+async function runTopicGrouping({ manual = false } = {}) {
+  console.debug(`[Closure:TopicGroup] Starting topic grouping run... (manual: ${manual})`);
   const { config } = await chrome.storage.local.get('config');
-  if (!config?.enableTopicGrouping) return;
+  if (!manual && !config?.enableTopicGrouping) {
+    console.debug('[Closure:TopicGroup] Skipped — feature disabled in config');
+    return;
+  }
 
   // Gather ungrouped, non-pinned, non-audible, non-whitelisted http(s) tabs
   const allTabs = await chrome.tabs.query({ pinned: false });
+  console.debug(`[Closure:TopicGroup] Found ${allTabs.length} non-pinned tabs`);
   const candidates = [];
   for (const tab of allTabs) {
     if (tab.groupId !== -1) continue;   // already grouped
@@ -222,9 +227,16 @@ async function runTopicGrouping() {
     candidates.push(tab);
   }
 
-  if (candidates.length < TOPIC_GROUPING_MIN_TABS) return;
+  console.debug(`[Closure:TopicGroup] ${candidates.length} candidate tabs after filtering (need >= ${TOPIC_GROUPING_MIN_TABS})`);
+  candidates.forEach((t, i) => console.debug(`  [${i}] ${t.title?.substring(0, 60)} — ${t.url?.substring(0, 80)}`));
+
+  if (candidates.length < TOPIC_GROUPING_MIN_TABS) {
+    console.debug('[Closure:TopicGroup] Not enough candidates, aborting');
+    return;
+  }
 
   // Extract content from each candidate tab
+  console.debug('[Closure:TopicGroup] Extracting page content...');
   const tabContents = [];
   for (const tab of candidates) {
     const content = await extractPageContent(tab);
@@ -233,6 +245,7 @@ async function runTopicGrouping() {
       title: content.title || tab.title || '',
       text: content.text || '',
     });
+    console.debug(`  Extracted: "${(content.title || tab.title || '').substring(0, 50)}" (${(content.text || '').length} chars)`);
   }
 
   // Build the AI prompt
@@ -242,36 +255,61 @@ async function runTopicGrouping() {
 
   const prompt = `You are a tab organizer. Group these browser tabs by topic. Only create a cluster if 2 or more tabs share a clear theme. Leave unrelated tabs unclustered. Return ONLY valid JSON, no markdown:\n{"clusters":[{"title":"Short Topic Name","indices":[0,1]}]}\n\n${summaries}`;
 
+  console.debug('[Closure:TopicGroup] AI prompt built, sending to content script...');
+  console.debug('[Closure:TopicGroup] Prompt length:', prompt.length, 'chars');
+
   // Run AI via content script injection (LanguageModel lives in page context)
   let clusters;
   try {
     // Pick the first candidate tab to run AI in its context
     const hostTab = candidates[0];
+    console.debug(`[Closure:TopicGroup] Injecting into tab ${hostTab.id}: "${hostTab.title?.substring(0, 40)}"`);
     const results = await chrome.scripting.executeScript({
       target: { tabId: hostTab.id },
       func: contentScriptTopicCluster,
       args: [prompt],
     });
 
-    if (!results?.[0]?.result) return;
+    if (!results?.[0]?.result) {
+      console.debug('[Closure:TopicGroup] AI returned no result (unavailable or error)');
+      return;
+    }
     clusters = results[0].result;
-  } catch {
-    return; // AI unavailable or injection failed
+    console.debug('[Closure:TopicGroup] AI response:', JSON.stringify(clusters));
+  } catch (err) {
+    console.debug('[Closure:TopicGroup] Script injection failed:', err?.message || err);
+    return;
   }
 
-  if (!clusters?.clusters || !Array.isArray(clusters.clusters)) return;
+  if (!clusters?.clusters || !Array.isArray(clusters.clusters)) {
+    console.debug('[Closure:TopicGroup] Invalid cluster structure, aborting');
+    return;
+  }
+
+  console.debug(`[Closure:TopicGroup] AI returned ${clusters.clusters.length} cluster(s)`);
 
   // Create tab groups from AI clusters
   for (const cluster of clusters.clusters) {
-    if (!cluster.title || !Array.isArray(cluster.indices)) continue;
-    if (cluster.indices.length < 2) continue;
+    if (!cluster.title || !Array.isArray(cluster.indices)) {
+      console.debug(`[Closure:TopicGroup] Skipping malformed cluster:`, cluster);
+      continue;
+    }
+    if (cluster.indices.length < 2) {
+      console.debug(`[Closure:TopicGroup] Skipping "${cluster.title}" — only ${cluster.indices.length} tab(s)`);
+      continue;
+    }
+
+    console.debug(`[Closure:TopicGroup] Processing cluster "${cluster.title}" with indices [${cluster.indices}]`);
 
     // Map indices to tab IDs, skipping invalid indices
     const tabIds = cluster.indices
       .filter((i) => i >= 0 && i < tabContents.length)
       .map((i) => tabContents[i].tab.id);
 
-    if (tabIds.length < 2) continue;
+    if (tabIds.length < 2) {
+      console.debug(`[Closure:TopicGroup] Not enough valid tab IDs for "${cluster.title}", skipping`);
+      continue;
+    }
 
     // Verify tabs still exist and are ungrouped
     const validIds = [];
@@ -280,11 +318,14 @@ async function runTopicGrouping() {
         const t = await chrome.tabs.get(id);
         if (t.groupId === -1) validIds.push(id);
       } catch {
-        // Tab was closed between extraction and grouping
+        console.debug(`[Closure:TopicGroup] Tab ${id} no longer exists`);
       }
     }
 
-    if (validIds.length < 2) continue;
+    if (validIds.length < 2) {
+      console.debug(`[Closure:TopicGroup] Not enough ungrouped tabs for "${cluster.title}" after verification`);
+      continue;
+    }
 
     try {
       const groupId = await chrome.tabs.group({ tabIds: validIds });
@@ -294,10 +335,13 @@ async function runTopicGrouping() {
         color: GROUP_COLORS[colorIndex],
         collapsed: true,
       });
+      console.debug(`[Closure:TopicGroup] Created group "${cluster.title.toUpperCase()}" with ${validIds.length} tabs (color: ${GROUP_COLORS[colorIndex]})`);
     } catch (err) {
-      console.error('[Closure] Topic group creation error:', err);
+      console.error('[Closure:TopicGroup] Group creation error:', err);
     }
   }
+
+  console.debug('[Closure:TopicGroup] Run complete');
 }
 
 /**
@@ -313,25 +357,38 @@ async function contentScriptTopicCluster(prompt) {
     let session;
 
     if (typeof LanguageModel !== 'undefined') {
+      console.debug('[Closure:AI] Using LanguageModel API');
       const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+      console.debug('[Closure:AI] Availability:', availability);
       if (availability === 'unavailable') return null;
       session = await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+      console.debug('[Closure:AI] Session created');
     } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
-      const capabilities = await window.ai.languageModel.capabilities?.();
+      console.debug('[Closure:AI] Using legacy window.ai API');
+      const capabilities = await window.ai.languageModel.capabilities?.({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
       if (capabilities?.available === 'no') return null;
-      session = await window.ai.languageModel.create();
+      session = await window.ai.languageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
     } else {
+      console.debug('[Closure:AI] No AI API available');
       return null;
     }
 
+    console.debug('[Closure:AI] Sending prompt (' + prompt.length + ' chars)...');
     const response = await session.prompt(prompt);
     session.destroy();
+    console.debug('[Closure:AI] Raw response:', response);
 
     // Parse JSON from response (AI may wrap in markdown code fences)
     const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]);
-  } catch {
+    if (!jsonMatch) {
+      console.debug('[Closure:AI] No JSON found in response');
+      return null;
+    }
+    const parsed = JSON.parse(jsonMatch[0]);
+    console.debug('[Closure:AI] Parsed clusters:', JSON.stringify(parsed));
+    return parsed;
+  } catch (err) {
+    console.debug('[Closure:AI] Error:', err?.message || err);
     return null;
   }
 }
@@ -765,9 +822,9 @@ async function contentScriptSummarize(title, metaDescription, text) {
       session = await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
     } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
       // Legacy fallback
-      const capabilities = await window.ai.languageModel.capabilities?.();
+      const capabilities = await window.ai.languageModel.capabilities?.({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
       if (capabilities?.available === 'no') return null;
-      session = await window.ai.languageModel.create();
+      session = await window.ai.languageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
     } else {
       return null; // No AI available
     }
@@ -1123,10 +1180,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'runTopicGrouping') {
-    runTopicGrouping().then(() => {
+    runTopicGrouping({ manual: true }).then(() => {
       sendResponse({ ok: true });
     }).catch((err) => {
-      console.error('[Closure] Manual topic grouping error:', err);
+      console.error('[Closure:TopicGroup] Manual trigger error:', err);
       sendResponse({ ok: false });
     });
     return true;

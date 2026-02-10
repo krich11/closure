@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Popup script (popup.js)
- * @version 1.3.1
+ * @version 1.3.2
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -89,13 +89,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Cluster by Topic button — only shown when AI topic grouping is enabled
+  // Cluster by Topic button — always visible for manual trigger
   const clusterBtn = document.getElementById('cluster-now');
   if (clusterBtn) {
-    const cfg = data.config || {};
-    if (cfg.enableTopicGrouping) {
-      clusterBtn.hidden = false;
-    }
+    clusterBtn.hidden = false;
 
     clusterBtn.addEventListener('click', async () => {
       clusterBtn.disabled = true;
