@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Onboarding page (onboarding.js)
- * @version 1.2.1
+ * @version 1.2.2
  *
  * Multi-step first-run experience. No network calls.
  * Navigates between steps with simple show/hide.
