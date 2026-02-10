@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.3.2
+ * @version 1.4.0
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -55,6 +55,9 @@ const NUCLEAR_IDLE_HOURS = 4;
 const TOPIC_GROUPING_ALARM = 'topic-grouping';
 const TOPIC_GROUPING_MIN_TABS = 4;
 
+// ─── Notification-based Stay of Execution ───────────────────────
+const STAY_NOTIF_PREFIX = 'closure-stay-';
+
 // Race condition guard: tabs currently being archived
 const archivingTabs = new Set();
 
@@ -80,8 +83,78 @@ const TITLE_ERROR_PATTERNS = [
 // ─── Helpers ─────────────────────────────────────────────────────
 
 /**
+ * Common multi-part TLD suffixes. Used by getRegistrableDomain()
+ * to correctly extract eTLD+1 (e.g. "bbc.co.uk" not just "co.uk").
+ *
+ * Not exhaustive, but covers the vast majority of real-world browsing.
+ * Kept inline to avoid external dependencies.
+ */
+const MULTI_PART_TLDS = new Set([
+  'co.uk', 'org.uk', 'me.uk', 'ac.uk', 'gov.uk', 'net.uk',
+  'co.jp', 'or.jp', 'ne.jp', 'ac.jp', 'go.jp',
+  'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au',
+  'co.nz', 'net.nz', 'org.nz', 'govt.nz',
+  'co.in', 'net.in', 'org.in', 'ac.in', 'gov.in',
+  'com.br', 'net.br', 'org.br', 'gov.br',
+  'co.kr', 'or.kr', 'ne.kr', 'go.kr',
+  'co.za', 'org.za', 'net.za', 'gov.za',
+  'com.mx', 'org.mx', 'net.mx', 'gob.mx',
+  'com.cn', 'net.cn', 'org.cn', 'gov.cn',
+  'com.tw', 'org.tw', 'net.tw', 'gov.tw',
+  'com.hk', 'org.hk', 'net.hk', 'gov.hk',
+  'com.sg', 'org.sg', 'net.sg', 'gov.sg',
+  'co.il', 'org.il', 'net.il', 'ac.il',
+  'com.ar', 'org.ar', 'net.ar', 'gov.ar',
+  'com.tr', 'org.tr', 'net.tr', 'gov.tr',
+  'co.id', 'or.id', 'go.id', 'web.id',
+  'co.th', 'or.th', 'go.th', 'in.th',
+  'com.ph', 'org.ph', 'net.ph', 'gov.ph',
+  'com.my', 'org.my', 'net.my', 'gov.my',
+  'com.pk', 'org.pk', 'net.pk', 'gov.pk',
+  'com.ng', 'org.ng', 'gov.ng',
+  'com.eg', 'org.eg', 'gov.eg',
+  'co.ke', 'or.ke', 'go.ke',
+  'com.ua', 'org.ua', 'net.ua',
+  'com.pl', 'org.pl', 'net.pl',
+  'com.es', 'org.es', 'nom.es',
+  'com.pt', 'org.pt', 'net.pt',
+  'co.it',
+]);
+
+/**
+ * Extract the registrable domain (eTLD+1) from a hostname.
+ * Groups all subdomains under the same root.
+ *
+ * Examples:
+ *   "docs.google.com"  → "google.com"
+ *   "en.wikipedia.org" → "wikipedia.org"
+ *   "www.bbc.co.uk"    → "bbc.co.uk"
+ *   "github.com"       → "github.com"
+ *
+ * @param {string} hostname — e.g. "mail.google.com"
+ * @returns {string} registrable domain
+ */
+function getRegistrableDomain(hostname) {
+  const host = hostname.replace(/^www\./, '');
+  const parts = host.split('.');
+
+  if (parts.length <= 2) return host;
+
+  // Check if the last two segments form a known multi-part TLD
+  const lastTwo = parts.slice(-2).join('.');
+  if (MULTI_PART_TLDS.has(lastTwo)) {
+    // eTLD is two parts, so registrable domain is last three segments
+    return parts.length >= 3 ? parts.slice(-3).join('.') : host;
+  }
+
+  // Standard TLD — registrable domain is last two segments
+  return parts.slice(-2).join('.');
+}
+
+/**
  * Extract a grouping-friendly domain from a URL.
- * Strips "www." prefix so www.example.com and example.com group together.
+ * Returns the registrable domain (eTLD+1) so that subdomains like
+ * docs.google.com and mail.google.com group together.
  * Returns null for chrome://, about:, and other non-http(s) URLs.
  */
 function getRootDomain(url) {
@@ -90,7 +163,7 @@ function getRootDomain(url) {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return null;
     }
-    return parsed.hostname.replace(/^www\./, '');
+    return getRegistrableDomain(parsed.hostname);
   } catch {
     return null;
   }
@@ -235,49 +308,34 @@ async function runTopicGrouping({ manual = false } = {}) {
     return;
   }
 
-  // Extract content from each candidate tab
-  console.debug('[Closure:TopicGroup] Extracting page content...');
-  const tabContents = [];
-  for (const tab of candidates) {
-    const content = await extractPageContent(tab);
-    tabContents.push({
-      tab,
-      title: content.title || tab.title || '',
-      text: content.text || '',
-    });
-    console.debug(`  Extracted: "${(content.title || tab.title || '').substring(0, 50)}" (${(content.text || '').length} chars)`);
-  }
-
-  // Build the AI prompt
-  const summaries = tabContents
-    .map((tc, i) => `[${i}] ${tc.title}\n${tc.text.substring(0, 200)}`)
+  // Build the AI prompt from tab titles and URLs (no injection needed)
+  const summaries = candidates
+    .map((t, i) => `[${i}] ${t.title || 'Untitled'}\n${t.url}`)
     .join('\n\n');
 
   const prompt = `You are a tab organizer. Group these browser tabs by topic. Only create a cluster if 2 or more tabs share a clear theme. Leave unrelated tabs unclustered. Return ONLY valid JSON, no markdown:\n{"clusters":[{"title":"Short Topic Name","indices":[0,1]}]}\n\n${summaries}`;
 
-  console.debug('[Closure:TopicGroup] AI prompt built, sending to content script...');
+  console.debug('[Closure:TopicGroup] AI prompt built, sending to offscreen document...');
   console.debug('[Closure:TopicGroup] Prompt length:', prompt.length, 'chars');
 
-  // Run AI via content script injection (LanguageModel lives in page context)
+  // Run AI through offscreen document (no host permissions needed)
   let clusters;
   try {
-    // Pick the first candidate tab to run AI in its context
-    const hostTab = candidates[0];
-    console.debug(`[Closure:TopicGroup] Injecting into tab ${hostTab.id}: "${hostTab.title?.substring(0, 40)}"`);
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: hostTab.id },
-      func: contentScriptTopicCluster,
-      args: [prompt],
-    });
-
-    if (!results?.[0]?.result) {
-      console.debug('[Closure:TopicGroup] AI returned no result (unavailable or error)');
+    const response = await promptAi(prompt);
+    if (!response) {
+      console.debug('[Closure:TopicGroup] AI returned no response');
       return;
     }
-    clusters = results[0].result;
+    // Parse JSON from response (AI may wrap in markdown code fences)
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.debug('[Closure:TopicGroup] No JSON found in AI response');
+      return;
+    }
+    clusters = JSON.parse(jsonMatch[0]);
     console.debug('[Closure:TopicGroup] AI response:', JSON.stringify(clusters));
   } catch (err) {
-    console.debug('[Closure:TopicGroup] Script injection failed:', err?.message || err);
+    console.debug('[Closure:TopicGroup] AI call failed:', err?.message || err);
     return;
   }
 
@@ -303,8 +361,8 @@ async function runTopicGrouping({ manual = false } = {}) {
 
     // Map indices to tab IDs, skipping invalid indices
     const tabIds = cluster.indices
-      .filter((i) => i >= 0 && i < tabContents.length)
-      .map((i) => tabContents[i].tab.id);
+      .filter((i) => i >= 0 && i < candidates.length)
+      .map((i) => candidates[i].id);
 
     if (tabIds.length < 2) {
       console.debug(`[Closure:TopicGroup] Not enough valid tab IDs for "${cluster.title}", skipping`);
@@ -344,51 +402,44 @@ async function runTopicGrouping({ manual = false } = {}) {
   console.debug('[Closure:TopicGroup] Run complete');
 }
 
+// ─── Offscreen AI Helpers ───────────────────────────────────────
+
 /**
- * Self-contained function injected into a page to run AI topic clustering.
- * Checks for LanguageModel global (Chrome 138+) or legacy window.ai.
- * Must have no references to outer scope.
+ * Ensure the offscreen document exists. Chrome only allows one
+ * offscreen document per extension at a time.
+ */
+async function ensureOffscreen() {
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+  });
+  if (contexts.length > 0) return;
+
+  await chrome.offscreen.createDocument({
+    url: chrome.runtime.getURL('offscreen/offscreen.html'),
+    reasons: ['DOM_PARSER'],
+    justification: 'Run on-device AI (LanguageModel) for tab summarization and topic clustering',
+  });
+}
+
+/**
+ * Send a prompt to the on-device AI via the offscreen document.
+ * Returns the raw text response, or null if AI is unavailable.
  *
  * @param {string} prompt
- * @returns {Promise<{ clusters: Array<{ title: string, indices: number[] }> }|null>}
+ * @returns {Promise<string|null>}
  */
-async function contentScriptTopicCluster(prompt) {
+async function promptAi(prompt) {
   try {
-    let session;
-
-    if (typeof LanguageModel !== 'undefined') {
-      console.debug('[Closure:AI] Using LanguageModel API');
-      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-      console.debug('[Closure:AI] Availability:', availability);
-      if (availability === 'unavailable') return null;
-      session = await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-      console.debug('[Closure:AI] Session created');
-    } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
-      console.debug('[Closure:AI] Using legacy window.ai API');
-      const capabilities = await window.ai.languageModel.capabilities?.({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-      if (capabilities?.available === 'no') return null;
-      session = await window.ai.languageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-    } else {
-      console.debug('[Closure:AI] No AI API available');
-      return null;
-    }
-
-    console.debug('[Closure:AI] Sending prompt (' + prompt.length + ' chars)...');
-    const response = await session.prompt(prompt);
-    session.destroy();
-    console.debug('[Closure:AI] Raw response:', response);
-
-    // Parse JSON from response (AI may wrap in markdown code fences)
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.debug('[Closure:AI] No JSON found in response');
-      return null;
-    }
-    const parsed = JSON.parse(jsonMatch[0]);
-    console.debug('[Closure:AI] Parsed clusters:', JSON.stringify(parsed));
-    return parsed;
+    await ensureOffscreen();
+    const response = await chrome.runtime.sendMessage({
+      action: 'aiPrompt',
+      prompt,
+    });
+    if (response?.ok) return response.result;
+    console.debug('[Closure:AI] Offscreen returned error:', response?.error);
+    return null;
   } catch (err) {
-    console.debug('[Closure:AI] Error:', err?.message || err);
+    console.debug('[Closure:AI] promptAi failed:', err?.message || err);
     return null;
   }
 }
@@ -491,34 +542,20 @@ async function runDeadEndSweep() {
 /**
  * Detect whether a tab is showing an error page.
  *
- * First tries a fast title-based check, then falls back to
- * injecting the content script for deeper analysis.
+ * Uses title-based pattern matching and stuck-tab heuristics.
+ * No content script injection — works without host_permissions.
  *
  * @param {chrome.tabs.Tab} tab
  * @returns {Promise<{ isError: boolean, reason: string }>}
  */
 async function detectTabError(tab) {
-  // Fast path: check tab title against known error patterns
+  // Check tab title against known error patterns
   const titleResult = checkTitleForErrors(tab.title || '');
   if (titleResult.isError) return titleResult;
 
   // Check for stuck loading (status !== 'complete' for > 1 hour)
   if (await isTabStuck(tab)) {
     return { isError: true, reason: 'Tab stuck loading for > 1 hour' };
-  }
-
-  // Slow path: inject content script for HTTP status + body check
-  try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: contentScriptDetectError,
-    });
-
-    if (results && results[0] && results[0].result) {
-      return results[0].result;
-    }
-  } catch {
-    // Injection may fail on restricted pages (chrome://, etc.) — skip
   }
 
   return { isError: false, reason: '' };
@@ -562,53 +599,7 @@ async function isTabStuck(tab) {
   return elapsed > STUCK_TAB_THRESHOLD_MS;
 }
 
-/**
- * Inline function injected into the tab via chrome.scripting.executeScript.
- * Runs in the page context — checks HTTP status via Performance API
- * and scans page content for error patterns.
- *
- * Must be self-contained (no references to outer scope).
- */
-function contentScriptDetectError() {
-  const result = { isError: false, reason: '' };
-
-  // Check HTTP status via Navigation Timing API
-  try {
-    const navEntries = performance.getEntriesByType('navigation');
-    if (navEntries.length > 0) {
-      const status = navEntries[0].responseStatus;
-      if (status && status >= 400) {
-        result.isError = true;
-        result.reason = `HTTP ${status}`;
-        return result;
-      }
-    }
-  } catch {
-    // API may not be available
-  }
-
-  // Scan body text for error patterns
-  const patterns = [
-    /\b404\b/i, /\b500\b/i, /\b502\b/i, /\b503\b/i,
-    /timed?\s*out/i, /site\s+can'?t\s+be\s+reached/i,
-    /ERR_/i, /DNS_PROBE/i, /server\s+error/i,
-    /page\s+not\s+found/i,
-  ];
-
-  const text = (document.body?.innerText || '').substring(0, 2000);
-  const combined = `${document.title || ''} ${text}`;
-
-  for (const pattern of patterns) {
-    if (pattern.test(combined)) {
-      const match = combined.match(pattern);
-      result.isError = true;
-      result.reason = `Content match: ${match ? match[0] : pattern.source}`;
-      return result;
-    }
-  }
-
-  return result;
-}
+// contentScriptDetectError removed — detection now uses title patterns + stuck heuristic only
 
 /**
  * Log a swept tab to storage, update stats, then close it.
@@ -721,143 +712,29 @@ async function isTabSnoozed(tabId) {
 }
 
 /**
- * Extract page content from a tab by injecting a content script.
- * Falls back to tab metadata if injection fails.
+ * Attempt AI summarization of a tab using title + URL via the offscreen document.
+ * If AI is unavailable, returns a fallback summary from tab metadata.
  *
  * @param {chrome.tabs.Tab} tab
- * @returns {Promise<{ title: string, metaDescription: string, text: string, faviconUrl: string }>}
- */
-async function extractPageContent(tab) {
-  try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: contentScriptExtractContent,
-    });
-
-    if (results && results[0] && results[0].result) {
-      return results[0].result;
-    }
-  } catch {
-    // Injection failed — use metadata fallback
-  }
-
-  // Fallback: use what we have from the tab object
-  return {
-    title: tab.title || '',
-    metaDescription: '',
-    text: '',
-    faviconUrl: tab.favIconUrl || '',
-  };
-}
-
-/**
- * Self-contained function injected into pages to extract content.
- * Must have no references to outer scope.
- */
-function contentScriptExtractContent() {
-  const title = document.title || '';
-
-  const metaEl = document.querySelector('meta[name="description"]');
-  const metaDescription = metaEl ? metaEl.getAttribute('content') || '' : '';
-
-  const text = (document.body?.innerText || '').substring(0, 500);
-
-  const iconLink = document.querySelector('link[rel~="icon"]');
-  const faviconUrl = iconLink
-    ? iconLink.href
-    : `${location.origin}/favicon.ico`;
-
-  return { title, metaDescription, text, faviconUrl };
-}
-
-/**
- * Attempt AI summarization of page content via window.ai.
- * If unavailable, returns a fallback summary from the raw text.
- *
- * This runs via content script injection since window.ai lives
- * in the page context, not the service worker.
- *
- * @param {chrome.tabs.Tab} tab
- * @param {{ title: string, metaDescription: string, text: string }} content
  * @returns {Promise<{ summary: string, summaryType: 'ai'|'fallback' }>}
  */
-async function summarizeContent(tab, content) {
-  try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: contentScriptSummarize,
-      args: [content.title, content.metaDescription, content.text],
-    });
+async function summarizeTab(tab) {
+  const title = tab.title || 'Untitled';
+  const url = tab.url || '';
 
-    if (results && results[0] && results[0].result) {
-      return results[0].result;
-    }
-  } catch {
-    // AI unavailable or injection failed
+  const prompt = `Summarize this page in 3 bullet points (total under 100 words), preserving key facts, numbers, dates, action items, and the user's likely intent for visiting.\n\nTitle: ${title}\nURL: ${url}`;
+
+  const aiResult = await promptAi(prompt);
+  if (aiResult) {
+    return { summary: aiResult, summaryType: 'ai' };
   }
 
-  // Fallback: use raw content as summary
-  const fallback = buildFallbackSummary(content);
-  return { summary: fallback, summaryType: 'fallback' };
+  // Fallback: use title + URL
+  return { summary: title, summaryType: 'fallback' };
 }
 
 /**
- * Self-contained function injected into pages to run AI summarization.
- * Checks for LanguageModel global (Chrome 138+) or legacy window.ai.
- * Must have no references to outer scope.
- *
- * @param {string} title
- * @param {string} metaDescription
- * @param {string} text
- * @returns {Promise<{ summary: string, summaryType: 'ai'|'fallback' }|null>}
- */
-async function contentScriptSummarize(title, metaDescription, text) {
-  try {
-    let session;
-
-    // Try the new global LanguageModel API first (Chrome 138+)
-    if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-      if (availability === 'unavailable') return null;
-      session = await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-    } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
-      // Legacy fallback
-      const capabilities = await window.ai.languageModel.capabilities?.({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-      if (capabilities?.available === 'no') return null;
-      session = await window.ai.languageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-    } else {
-      return null; // No AI available
-    }
-
-    const pageContent = `Title: ${title}\nDescription: ${metaDescription}\nContent: ${text}`;
-    const prompt = `Summarize this page in 3 bullet points (total under 100 words), preserving key facts, numbers, dates, action items, and the user's likely intent for visiting.\n\n${pageContent}`;
-
-    const summary = await session.prompt(prompt);
-    session.destroy();
-
-    return { summary, summaryType: 'ai' };
-  } catch {
-    // AI error (insufficient resources, etc.) — fall back silently
-    return null;
-  }
-}
-
-/**
- * Build a fallback summary from raw extracted content.
- *
- * @param {{ title: string, metaDescription: string, text: string }} content
- * @returns {string}
- */
-function buildFallbackSummary(content) {
-  const parts = [];
-  if (content.title) parts.push(content.title);
-  if (content.metaDescription) parts.push(content.metaDescription);
-  if (content.text) parts.push(content.text.substring(0, 300));
-  return parts.join(' — ') || 'No content available';
-}
-
-/**
- * Archive a single tab: extract content, summarize, persist to storage,
+ * Archive a single tab: summarize via AI (offscreen), persist to storage,
  * then close the tab and send a notification.
  *
  * Critical ordering: save to storage BEFORE closing the tab to survive
@@ -874,12 +751,10 @@ async function archiveTab(tab) {
   }
 
   const domain = getRootDomain(tab.url) || 'unknown';
+  const title = tab.title || 'Untitled';
 
-  // Extract page content
-  const content = await extractPageContent(tab);
-
-  // Attempt AI summarization
-  const { summary, summaryType } = await summarizeContent(tab, content);
+  // Attempt AI summarization via offscreen document
+  const { summary, summaryType } = await summarizeTab(tab);
 
   // Persist to storage BEFORE closing (survives worker death)
   const data = await chrome.storage.local.get(['archived', 'stats']);
@@ -888,8 +763,8 @@ async function archiveTab(tab) {
 
   archived.push({
     url: tab.url || '',
-    title: content.title || tab.title || 'Untitled',
-    favicon: content.faviconUrl || tab.favIconUrl || '',
+    title,
+    favicon: tab.favIconUrl || '',
     timestamp: Date.now(),
     summary,
     summaryType,
@@ -909,7 +784,7 @@ async function archiveTab(tab) {
   }
 
   // Send notification
-  sendArchivalNotification(content.title || tab.title || 'Untitled');
+  sendArchivalNotification(title);
 }
 
 /**
@@ -977,94 +852,35 @@ async function handleNuclearArchive() {
 }
 
 /**
- * Inject a "Stay of Execution" overlay into a tab.
- * Shows a countdown with "Keep this open?" / "Yes" / "Snooze 24h".
- * Self-contained injection — no external dependencies.
+ * Show a "Stay of Execution" notification for a tab about to be archived.
+ * Uses chrome.notifications with action buttons instead of content script
+ * injection — works without host_permissions.
+ *
+ * Notification ID encodes the tabId so the onButtonClicked handler can
+ * route the decision back to the correct tab.
  *
  * @param {number} tabId
  */
-async function injectStayOfExecution(tabId) {
+async function showStayOfExecution(tabId) {
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: contentScriptStayOfExecution,
+    const tab = await chrome.tabs.get(tabId);
+    const truncatedTitle = (tab.title || 'Untitled').substring(0, 40);
+
+    chrome.notifications.create(`${STAY_NOTIF_PREFIX}${tabId}`, {
+      type: 'basic',
+      iconUrl: 'icons/icon-128.png',
+      title: 'Tab About to Be Archived',
+      message: `"${truncatedTitle}" has been idle. Keep it open?`,
+      buttons: [
+        { title: 'Yes, Keep Open' },
+        { title: 'Snooze 24h' },
+      ],
+      requireInteraction: true,
+      priority: 2,
     });
   } catch {
-    // Injection failed (restricted page) — proceed with archival
+    // Tab may have been closed or notification creation failed — skip
   }
-}
-
-/**
- * Self-contained function that injects the Stay of Execution overlay.
- * Must have no references to outer scope.
- */
-function contentScriptStayOfExecution() {
-  // Don't inject twice
-  if (document.getElementById('closure-stay-overlay')) return;
-
-  const overlay = document.createElement('div');
-  overlay.id = 'closure-stay-overlay';
-  overlay.setAttribute('role', 'alertdialog');
-  overlay.setAttribute('aria-label', 'Tab about to be archived');
-  overlay.innerHTML = `
-    <style>
-      #closure-stay-overlay {
-        position: fixed; top: 0; left: 0; right: 0;
-        z-index: 2147483647;
-        background: linear-gradient(135deg, #fdfbf7 0%, #f5f0e8 100%);
-        border-bottom: 2px solid #d4a373;
-        padding: 16px 24px;
-        display: flex; align-items: center; justify-content: space-between;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        animation: closure-slide-down 0.3s ease;
-      }
-      @keyframes closure-slide-down {
-        from { transform: translateY(-100%); }
-        to { transform: translateY(0); }
-      }
-      #closure-stay-overlay .closure-msg {
-        font-size: 14px; color: #2d2a26;
-      }
-      #closure-stay-overlay .closure-icon {
-        width: 20px; height: 20px; margin-right: 10px;
-        border-radius: 4px; vertical-align: middle;
-      }
-      #closure-stay-overlay button {
-        padding: 6px 16px; border-radius: 4px; cursor: pointer;
-        font-size: 13px; font-weight: 500; margin-left: 8px;
-        border: 1px solid #d4a373; transition: all 0.2s;
-      }
-      #closure-stay-overlay .closure-keep {
-        background: #d4a373; color: white; border-color: #d4a373;
-      }
-      #closure-stay-overlay .closure-keep:hover { background: #c59060; }
-      #closure-stay-overlay .closure-snooze {
-        background: white; color: #5e5b56;
-      }
-      #closure-stay-overlay .closure-snooze:hover { background: #f5f0e8; }
-    </style>
-    <span class="closure-msg">
-      <img class="closure-icon" src="${document.querySelector('link[rel~=icon]')?.href || ''}" alt="" onerror="this.style.display='none'">
-      This tab is about to be archived. Keep it open?
-    </span>
-    <span>
-      <button class="closure-keep" type="button">Yes, Keep</button>
-      <button class="closure-snooze" type="button">Snooze 24h</button>
-    </span>
-  `;
-
-  document.body.appendChild(overlay);
-
-  overlay.querySelector('.closure-keep').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'stayOfExecution', decision: 'keep' });
-    overlay.remove();
-  });
-
-  overlay.querySelector('.closure-snooze').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'stayOfExecution', decision: 'snooze' });
-    overlay.remove();
-  });
 }
 
 // ─── Event Listeners (registered synchronously at top level) ────
@@ -1117,6 +933,27 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== 'complete') return;
 
   try {
+    // If this tab is inside a group but its domain no longer matches
+    // the group (e.g. user clicked a cross-domain link that opened a
+    // new tab inheriting the opener's group), ungroup it first so it
+    // can be evaluated for the correct group.
+    if (tab.groupId !== -1 && !tab.pinned) {
+      const domain = getRootDomain(tab.url);
+      if (domain) {
+        try {
+          const group = await chrome.tabGroups.get(tab.groupId);
+          const groupDomain = group.title?.toLowerCase();
+          if (groupDomain && groupDomain !== domain) {
+            await chrome.tabs.ungroup(tabId);
+            // Re-fetch tab after ungrouping so evaluateAutoGroup sees the updated state
+            tab = await chrome.tabs.get(tabId);
+          }
+        } catch {
+          // Group may have been removed — that's fine
+        }
+      }
+    }
+
     await evaluateAutoGroup(tab);
   } catch (err) {
     console.error('[Closure] Auto-group error:', err);
@@ -1153,24 +990,37 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Message handler for content script + popup communication
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'stayOfExecution') {
-    const tabId = sender.tab?.id;
-    if (!tabId) return false;
+// Notification button handler — Stay of Execution responses
+chrome.notifications.onButtonClicked.addListener((notifId, buttonIndex) => {
+  if (!notifId.startsWith(STAY_NOTIF_PREFIX)) return;
 
-    if (message.decision === 'keep') {
-      // Remove from archiving set — tab stays open permanently
-      archivingTabs.delete(tabId);
-    } else if (message.decision === 'snooze') {
-      // Snooze for 24 hours via alarm (survives worker restart)
-      archivingTabs.delete(tabId);
-      chrome.alarms.create(`${SNOOZE_ALARM_PREFIX}${tabId}`, {
-        delayInMinutes: 24 * 60,
-      });
-    }
-    return false;
+  const tabId = parseInt(notifId.substring(STAY_NOTIF_PREFIX.length), 10);
+  if (isNaN(tabId)) return;
+
+  if (buttonIndex === 0) {
+    // "Yes, Keep Open" — remove from archiving set
+    archivingTabs.delete(tabId);
+  } else if (buttonIndex === 1) {
+    // "Snooze 24h" — remove from archiving set + set snooze alarm
+    archivingTabs.delete(tabId);
+    chrome.alarms.create(`${SNOOZE_ALARM_PREFIX}${tabId}`, {
+      delayInMinutes: 24 * 60,
+    });
   }
+
+  // Dismiss the notification
+  chrome.notifications.clear(notifId);
+});
+
+// Auto-dismiss stay-of-execution notifications when closed without clicking buttons
+chrome.notifications.onClosed.addListener((notifId, byUser) => {
+  // If user dismissed without choosing → tab proceeds to archival (no action needed)
+});
+
+// Message handler for popup communication
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Ignore messages from the offscreen document (they're handled by sendMessage callback)
+  if (message.action === 'aiPrompt') return false;
 
   if (message.action === 'nuclearArchive') {
     handleNuclearArchive().then((count) => {

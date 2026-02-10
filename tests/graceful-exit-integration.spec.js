@@ -122,8 +122,9 @@ test.describe('Graceful Exit — Idle Tab Archival Integration', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
-    // Test AI fallback path — window.ai is not available in test,
-    // so summaryType should always be 'fallback'
+    // Test AI fallback path — LanguageModel API is not available in test
+    // (offscreen document can't reach Gemini Nano), so summaryType should
+    // always be 'fallback'
     await page.evaluate(async () => {
       await chrome.storage.local.set({
         archived: [{

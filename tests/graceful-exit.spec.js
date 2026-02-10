@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Closure — Graceful Exit Tests
- * @version 1.3.2
+ * @version 1.4.0
  *
- * Verifies the archival flow: idle detection, content extraction,
- * AI fallback, storage persistence, notifications, nuclear archive,
- * and Stay of Execution message handling.
+ * Verifies the archival flow: idle detection, AI summarization
+ * (via offscreen document), storage persistence, notifications,
+ * nuclear archive, and Stay of Execution notification handling.
  */
 
 const { test, expect } = require('./fixtures');
@@ -163,26 +163,28 @@ test.describe('Graceful Exit — Nuclear Archive', () => {
 });
 
 test.describe('Graceful Exit — Stay of Execution', () => {
-  test('stayOfExecution keep message is handled', async ({ context, extensionId }) => {
+  test('snooze alarm can be used for stay-of-execution', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
-    // Simulate a "keep" message from a content script
-    // The handler should not throw
-    const result = await page.evaluate(async () => {
-      try {
-        // Can't fully simulate sender.tab from popup context,
-        // but verify the message handler doesn't crash
-        await chrome.runtime.sendMessage({
-          action: 'stayOfExecution',
-          decision: 'keep',
-        });
-        return 'ok';
-      } catch {
-        return 'ok'; // Expected — no sender.tab in popup context
-      }
+    // Stay of Execution now uses chrome.notifications with action buttons
+    // instead of content script injection. Verify snooze alarm creation works
+    // (this is what the "Snooze 24h" button triggers).
+    await page.evaluate(async () => {
+      await chrome.alarms.create('snooze-99999', { delayInMinutes: 24 * 60 });
     });
-    expect(result).toBe('ok');
+
+    const alarm = await page.evaluate(async () => {
+      return chrome.alarms.get('snooze-99999');
+    });
+
+    expect(alarm).toBeTruthy();
+    expect(alarm.name).toBe('snooze-99999');
+
+    // Clean up
+    await page.evaluate(async () => {
+      await chrome.alarms.clear('snooze-99999');
+    });
   });
 
   test('Sunday Digest link opens digest page', async ({ context, extensionId }) => {
