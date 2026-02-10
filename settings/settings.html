@@ -205,6 +205,59 @@
         </div>
       </section>
 
+      <!-- Storage Management -->
+      <section class="settings-section" aria-labelledby="section-storage">
+        <h2 id="section-storage" class="section-title">Storage</h2>
+        <p class="section-desc">Manage data stored locally by Closure. Nothing is ever sent to the cloud.</p>
+        <button id="clear-storage-btn" class="btn btn-small btn-outline" type="button">Clear Storage…</button>
+      </section>
+
+      <!-- Clear Storage Dialog -->
+      <dialog id="clear-storage-dialog" class="storage-dialog" aria-labelledby="dialog-title">
+        <div class="dialog-content">
+          <h2 id="dialog-title" class="dialog-title">Clear Storage</h2>
+          <p class="dialog-desc">Select what to clear. This action cannot be undone.</p>
+
+          <ul class="storage-category-list">
+            <li class="storage-category">
+              <label>
+                <input type="checkbox" name="clear-cat" value="archived" checked>
+                <span class="storage-cat-name">Archived tabs</span>
+                <span id="size-archived" class="storage-cat-size">calculating…</span>
+              </label>
+            </li>
+            <li class="storage-category">
+              <label>
+                <input type="checkbox" name="clear-cat" value="swept" checked>
+                <span class="storage-cat-name">Swept tab log</span>
+                <span id="size-swept" class="storage-cat-size">calculating…</span>
+              </label>
+            </li>
+            <li class="storage-category">
+              <label>
+                <input type="checkbox" name="clear-cat" value="stats" checked>
+                <span class="storage-cat-name">Statistics</span>
+                <span id="size-stats" class="storage-cat-size">calculating…</span>
+              </label>
+            </li>
+            <li class="storage-category">
+              <label>
+                <input type="checkbox" name="clear-cat" value="config">
+                <span class="storage-cat-name">Settings &amp; whitelist</span>
+                <span id="size-config" class="storage-cat-size">calculating…</span>
+              </label>
+            </li>
+          </ul>
+
+          <p id="storage-total" class="storage-total">Total storage used: calculating…</p>
+
+          <div class="dialog-actions">
+            <button id="clear-storage-cancel" class="btn btn-small btn-outline" type="button">Cancel</button>
+            <button id="clear-storage-confirm" class="btn btn-small btn-danger" type="button">Clear Selected</button>
+          </div>
+        </div>
+      </dialog>
+
       <!-- Save / Status -->
       <div class="settings-actions">
         <div id="save-status" class="save-status" role="status" aria-live="polite"></div>
@@ -212,7 +265,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.7.0 — 100% local, 100% private.</p>
+      <p>Closure v1.7.1 — 100% local, 100% private.</p>
     </footer>
   </div>
 

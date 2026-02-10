@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Memory Lane (digest.js)
- * @version 1.7.0
+ * @version 1.7.1
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -197,27 +197,16 @@ async function setupEventListeners() {
     }
   });
 
-  // Cluster button — enable when AI is available (try new LanguageModel global, then legacy window.ai)
-  const clusterBtn = document.getElementById('cluster-btn');
+  // Enable the Theme sort option when AI is available
+  const themeOption = document.getElementById('sort-theme-option');
   const aiHint = document.getElementById('ai-hint');
   const aiHintLink = document.getElementById('ai-hint-link');
-  if (clusterBtn) {
+  if (themeOption) {
     const aiReady = await isAiAvailable();
     if (aiReady) {
-      clusterBtn.disabled = false;
+      themeOption.disabled = false;
       if (aiHint) aiHint.hidden = true;
-      clusterBtn.addEventListener('click', async () => {
-        clusterBtn.disabled = true;
-        clusterBtn.textContent = 'Clustering...';
-        try {
-          await clusterByTheme();
-        } catch (err) {
-          console.error('[Closure] Clustering error:', err);
-          clusterBtn.textContent = 'Clustering failed';
-        }
-      });
     } else {
-      // Show the AI hint when AI is unavailable
       if (aiHint) aiHint.hidden = false;
       if (aiHintLink) {
         aiHintLink.addEventListener('click', (e) => {
@@ -237,10 +226,33 @@ function setupSortControl() {
   const sortSelect = document.getElementById('sort-select');
   if (sortSelect) {
     sortSelect.addEventListener('change', async () => {
-      // Persist sort preference
+      const value = sortSelect.value;
+
+      if (value === 'theme') {
+        // Show loading state in the dropdown
+        const themeOption = document.getElementById('sort-theme-option');
+        const origText = themeOption?.textContent;
+        if (themeOption) themeOption.textContent = '\u2728 Clustering\u2026';
+        sortSelect.disabled = true;
+
+        try {
+          await clusterByTheme();
+        } catch (err) {
+          console.error('[Closure] Clustering error:', err);
+          // Fall back to recency on failure
+          sortSelect.value = 'recency';
+          await loadAndRenderContent();
+        } finally {
+          if (themeOption) themeOption.textContent = origText;
+          sortSelect.disabled = false;
+        }
+        return;
+      }
+
+      // Persist sort preference (only for non-AI sorts)
       const { config } = await chrome.storage.local.get('config');
       if (config) {
-        config.archiveSortBy = sortSelect.value;
+        config.archiveSortBy = value;
         await chrome.storage.local.set({ config });
       }
       await loadAndRenderContent();

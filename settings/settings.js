@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.7.0
+ * @version 1.7.1
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkAiAvailability();
   loadWhitelist(cfg.whitelist ?? []);
   setupWhitelistInput();
+  setupClearStorage();
   checkIncognito();
 });
 
@@ -543,6 +544,116 @@ function setupWhitelistInput() {
 function getWhitelistFromDOM() {
   const items = document.querySelectorAll('.whitelist-domain');
   return Array.from(items).map(el => el.textContent.trim());
+}
+
+// ─── Clear Storage Dialog ─────────────────────────────────────────
+
+/**
+ * Estimate byte size of a value by JSON-serialising it.
+ */
+function estimateBytes(value) {
+  if (value === undefined || value === null) return 0;
+  return new Blob([JSON.stringify(value)]).size;
+}
+
+/**
+ * Format bytes into a human-friendly string.
+ */
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function setupClearStorage() {
+  const openBtn = document.getElementById('clear-storage-btn');
+  const dialog = document.getElementById('clear-storage-dialog');
+  const cancelBtn = document.getElementById('clear-storage-cancel');
+  const confirmBtn = document.getElementById('clear-storage-confirm');
+  if (!openBtn || !dialog) return;
+
+  openBtn.addEventListener('click', async () => {
+    await populateStorageSizes();
+    dialog.showModal();
+  });
+
+  cancelBtn?.addEventListener('click', () => dialog.close());
+
+  // Close on backdrop click
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+
+  // Close on Escape (native dialog behaviour, but make sure)
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    dialog.close();
+  });
+
+  confirmBtn?.addEventListener('click', async () => {
+    const checked = dialog.querySelectorAll('input[name="clear-cat"]:checked');
+    const keys = Array.from(checked).map(cb => cb.value);
+    if (keys.length === 0) return;
+
+    // Build the removal payload
+    const removals = [];
+    for (const key of keys) {
+      if (key === 'config') {
+        removals.push('config');
+      } else {
+        removals.push(key);
+      }
+    }
+
+    await chrome.storage.local.remove(removals);
+
+    // If config was cleared, re-initialise defaults
+    if (keys.includes('config')) {
+      location.reload();
+      return;
+    }
+
+    // Refresh sizes and show confirmation
+    await populateStorageSizes();
+    confirmBtn.textContent = 'Cleared!';
+    confirmBtn.disabled = true;
+    setTimeout(() => {
+      confirmBtn.textContent = 'Clear Selected';
+      confirmBtn.disabled = false;
+      dialog.close();
+    }, 1200);
+  });
+}
+
+async function populateStorageSizes() {
+  const data = await chrome.storage.local.get(null);
+  const categories = {
+    archived: data.archived ?? [],
+    swept: data.swept ?? [],
+    stats: data.stats ?? {},
+    config: data.config ?? {},
+  };
+
+  let totalBytes = 0;
+  for (const [key, value] of Object.entries(categories)) {
+    const bytes = estimateBytes(value);
+    totalBytes += bytes;
+    const el = document.getElementById(`size-${key}`);
+    if (el) {
+      const count = Array.isArray(value) ? ` (${value.length} entries)` : '';
+      el.textContent = `${formatBytes(bytes)}${count}`;
+    }
+  }
+
+  // Account for other keys (schema_version, snoozed, etc.)
+  const otherKeys = Object.keys(data).filter(k => !categories.hasOwnProperty(k));
+  for (const k of otherKeys) {
+    totalBytes += estimateBytes(data[k]);
+  }
+
+  const totalEl = document.getElementById('storage-total');
+  if (totalEl) totalEl.textContent = `Total storage used: ${formatBytes(totalBytes)}`;
 }
 
 // ─── Incognito Detection ─────────────────────────────────────────

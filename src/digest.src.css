@@ -93,21 +93,21 @@
 
   /* ── Feed & Cards ─────────────────────────────────────────────── */
   .archive-feed {
-    @apply flex flex-col gap-6;
+    @apply flex flex-col gap-3;
     container-type: inline-size;
   }
 
   .archive-group {
-    @apply mb-10;
+    @apply mb-6;
   }
 
   .group-header {
-    @apply flex justify-between items-baseline mb-6 pb-2;
+    @apply flex justify-between items-baseline mb-3 pb-1.5;
     border-bottom: 2px solid var(--color-border);
   }
 
   .group-title {
-    @apply font-serif text-2xl m-0;
+    @apply font-serif text-xl m-0;
   }
 
   .group-actions button {
@@ -121,34 +121,36 @@
 
   /* ── Archive Card ─────────────────────────────────────────────── */
   .archive-card {
-    @apply bg-card rounded-lg p-6;
+    @apply bg-card rounded p-3;
     border: 1px solid var(--color-border);
     display: grid;
     grid-template-areas:
-      "icon content"
-      "icon footer";
-    grid-template-columns: 40px 1fr;
-    gap: 1.25rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+      "icon content actions";
+    grid-template-columns: 24px 1fr auto;
+    gap: 0.625rem;
+    align-items: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
 
   .archive-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     border-color: var(--color-warm);
   }
 
   .card-favicon {
     grid-area: icon;
-    @apply w-10 h-10 rounded object-contain;
+    @apply w-6 h-6 rounded object-contain;
   }
 
   .card-content {
     grid-area: content;
+    @apply min-w-0;
   }
 
   .card-title {
-    @apply font-serif text-xl m-0 mb-2 leading-snug;
+    @apply text-sm font-medium m-0 leading-snug truncate;
+    font-family: var(--font-sans);
   }
 
   .card-title a {
@@ -161,15 +163,15 @@
   }
 
   .card-summary {
-    @apply text-ink-secondary text-base;
+    @apply text-ink-secondary text-xs mt-0.5 leading-snug;
   }
 
   .card-summary ul {
-    @apply m-0 pl-5;
+    @apply m-0 pl-4;
   }
 
   .card-summary li {
-    @apply mb-1;
+    @apply mb-0;
   }
 
   .card-summary p {
@@ -177,14 +179,15 @@
   }
 
   .card-footer {
-    grid-area: footer;
-    @apply flex justify-between items-center mt-2 text-sm text-ink-muted;
+    grid-area: actions;
+    @apply flex items-center gap-3 text-xs text-ink-muted;
   }
 
   .restore-btn {
-    @apply bg-transparent py-1 px-2 rounded cursor-pointer text-ink-secondary;
+    @apply bg-transparent py-0.5 px-2 rounded cursor-pointer text-ink-secondary text-xs;
     border: 1px solid var(--color-border);
     transition: all 0.2s;
+    white-space: nowrap;
   }
 
   .restore-btn:hover {
@@ -296,7 +299,7 @@
   .archive-card {
     grid-template-areas:
       "content"
-      "footer";
+      "actions";
     grid-template-columns: 1fr;
   }
 
