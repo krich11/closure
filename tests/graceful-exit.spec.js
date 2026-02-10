@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Graceful Exit Tests
- * @version 1.4.0
+ * @version 1.5.0
  *
  * Verifies the archival flow: idle detection, AI summarization
  * (via offscreen document), storage persistence, notifications,

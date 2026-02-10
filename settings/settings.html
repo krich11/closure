@@ -32,6 +32,17 @@
           </button>
         </div>
 
+        <div class="field field-toggle field-toggle--permission">
+          <label for="enable-rich-analysis" class="field-label">
+            Rich page analysis
+            <span class="field-hint">Read page content for more accurate AI summaries and topic grouping. When disabled, Closure uses only tab titles and URLs. Enabling this grants Closure permission to read page content — Chrome will show a confirmation dialog.</span>
+          </label>
+          <button id="enable-rich-analysis" class="toggle" role="switch" aria-checked="false" type="button">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </button>
+          <div id="rich-analysis-status" class="rich-analysis-status" role="status" aria-live="polite" hidden></div>
+        </div>
+
         <div id="ai-status" class="ai-status" role="status" aria-live="polite"></div>
         <button id="ai-download-btn" class="btn btn-sm" hidden>Download AI Model</button>
 
@@ -174,7 +185,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.4.0 — 100% local, 100% private.</p>
+      <p>Closure v1.5.0 — 100% local, 100% private.</p>
     </footer>
   </div>
 

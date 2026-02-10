@@ -168,6 +168,38 @@
     @apply text-ink-muted;
   }
 
+  /* ── Rich Page Analysis Status ───────────────────────────────── */
+  .rich-analysis-status {
+    @apply text-xs py-2 px-3 rounded mt-2;
+    width: 100%;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+  }
+
+  .rich-analysis-status--success {
+    @apply text-green;
+    border-color: var(--color-green);
+    background: color-mix(in srgb, var(--color-green) 8%, var(--color-card));
+  }
+
+  .rich-analysis-status--warning {
+    @apply text-yellow;
+    border-color: var(--color-yellow);
+  }
+
+  .rich-analysis-status--error {
+    color: var(--color-red);
+    border-color: var(--color-red);
+  }
+
+  .rich-analysis-status--info {
+    @apply text-ink-secondary;
+  }
+
+  .field-toggle--permission {
+    @apply flex-wrap;
+  }
+
   /* ── AI Setup Guide ──────────────────────────────────────────── */
   .ai-setup-guide {
     @apply mt-3 rounded text-sm;

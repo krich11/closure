@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.4.0
+ * @version 1.5.0
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
   idleThresholdHours: 24,
   whitelist: [],
   enableThematicClustering: false,
+  enableRichPageAnalysis: false,
   enableTopicGrouping: false,
   topicGroupingIntervalMinutes: 120,
   topicGroupingOvernightOnly: false,
@@ -60,6 +61,47 @@ const STAY_NOTIF_PREFIX = 'closure-stay-';
 
 // Race condition guard: tabs currently being archived
 const archivingTabs = new Set();
+
+/**
+ * Check whether the user has granted optional scripting + host permissions.
+ * Returns true only if both scripting AND <all_urls> are granted.
+ */
+async function hasPageAccess() {
+  try {
+    return await chrome.permissions.contains({
+      permissions: ['scripting'],
+      origins: ['<all_urls>'],
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract page content from a tab via content script injection.
+ * Only callable when hasPageAccess() returns true.
+ * Returns null if injection fails (e.g. chrome:// pages, PDF, etc.).
+ *
+ * @param {number} tabId
+ * @returns {Promise<object|null>}
+ */
+async function extractTabContent(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js'],
+    });
+    // executeScript returns an array of InjectionResults
+    if (results && results[0] && results[0].result) {
+      return results[0].result;
+    }
+    return null;
+  } catch (err) {
+    // Expected for chrome://, edge://, extension pages, etc.
+    console.debug(`[Closure] Content extraction failed for tab ${tabId}:`, err.message);
+    return null;
+  }
+}
 
 /**
  * Error patterns matched against tab title for quick detection
@@ -308,12 +350,37 @@ async function runTopicGrouping({ manual = false } = {}) {
     return;
   }
 
-  // Build the AI prompt from tab titles and URLs (no injection needed)
-  const summaries = candidates
-    .map((t, i) => `[${i}] ${t.title || 'Untitled'}\n${t.url}`)
-    .join('\n\n');
+  // Build the AI prompt — enrich with page content if user opted in
+  const canExtract = config?.enableRichPageAnalysis && await hasPageAccess();
+  console.debug(`[Closure:TopicGroup] Rich page analysis: ${canExtract ? 'ENABLED' : 'disabled (title+URL only)'}`);
 
-  const prompt = `You are a tab organizer. Group these browser tabs by topic. Only create a cluster if 2 or more tabs share a clear theme. Leave unrelated tabs unclustered. Return ONLY valid JSON, no markdown:\n{"clusters":[{"title":"Short Topic Name","indices":[0,1]}]}\n\n${summaries}`;
+  const tabDescriptions = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const t = candidates[i];
+    let desc = `[${i}] ${t.title || 'Untitled'}\n${t.url}`;
+
+    if (canExtract) {
+      const content = await extractTabContent(t.id);
+      if (content) {
+        if (content.metaDescription) desc += `\nDescription: ${content.metaDescription}`;
+        if (content.ogDescription && content.ogDescription !== content.metaDescription) {
+          desc += `\nSummary: ${content.ogDescription}`;
+        }
+        if (content.headings?.length) {
+          desc += `\nHeadings: ${content.headings.slice(0, 4).join(' | ')}`;
+        }
+        if (content.excerpt) {
+          desc += `\nExcerpt: ${content.excerpt.substring(0, 300)}`;
+        }
+      }
+    }
+
+    tabDescriptions.push(desc);
+  }
+
+  const summaries = tabDescriptions.join('\n\n');
+
+  const prompt = `You are a strict tab organizer. Group these browser tabs ONLY if they share a specific, narrow topic. Do NOT group tabs just because they are vaguely tech-related or from similar platforms. A Google Search, a docs page, and an app dashboard are NOT the same topic unless they are clearly about the same subject. When in doubt, leave a tab unclustered. Include a short reason explaining why the tabs belong together. Return ONLY valid JSON, no markdown:\n{"clusters":[{"title":"Short Topic Name","reason":"why these tabs are grouped","indices":[0,1]}]}\n\n${summaries}`;
 
   console.debug('[Closure:TopicGroup] AI prompt built, sending to offscreen document...');
   console.debug('[Closure:TopicGroup] Prompt length:', prompt.length, 'chars');
@@ -358,6 +425,15 @@ async function runTopicGrouping({ manual = false } = {}) {
     }
 
     console.debug(`[Closure:TopicGroup] Processing cluster "${cluster.title}" with indices [${cluster.indices}]`);
+    if (cluster.reason) {
+      console.debug(`[Closure:TopicGroup]   Reason: ${cluster.reason}`);
+    }
+    // Log which tabs are in this cluster for easier debugging
+    cluster.indices.forEach((i) => {
+      if (i >= 0 && i < candidates.length) {
+        console.debug(`[Closure:TopicGroup]   → [${i}] ${candidates[i].title?.substring(0, 60)}`);
+      }
+    });
 
     // Map indices to tab IDs, skipping invalid indices
     const tabIds = cluster.indices
@@ -543,15 +619,25 @@ async function runDeadEndSweep() {
  * Detect whether a tab is showing an error page.
  *
  * Uses title-based pattern matching and stuck-tab heuristics.
- * No content script injection — works without host_permissions.
+ * When rich page analysis is enabled, also checks HTTP status via
+ * content script injection for more accurate detection.
  *
  * @param {chrome.tabs.Tab} tab
  * @returns {Promise<{ isError: boolean, reason: string }>}
  */
 async function detectTabError(tab) {
-  // Check tab title against known error patterns
+  // Check tab title against known error patterns (fastest, no injection)
   const titleResult = checkTitleForErrors(tab.title || '');
   if (titleResult.isError) return titleResult;
+
+  // If user opted in to rich page analysis, check HTTP status via content script
+  const { config } = await chrome.storage.local.get('config');
+  if (config?.enableRichPageAnalysis && await hasPageAccess()) {
+    const content = await extractTabContent(tab.id);
+    if (content?.httpStatus && content.httpStatus >= 400) {
+      return { isError: true, reason: `HTTP ${content.httpStatus}` };
+    }
+  }
 
   // Check for stuck loading (status !== 'complete' for > 1 hour)
   if (await isTabStuck(tab)) {
@@ -712,8 +798,10 @@ async function isTabSnoozed(tabId) {
 }
 
 /**
- * Attempt AI summarization of a tab using title + URL via the offscreen document.
- * If AI is unavailable, returns a fallback summary from tab metadata.
+ * Attempt AI summarization of a tab via the offscreen document.
+ * When rich page analysis is enabled, injects content script to extract
+ * page content for dramatically better summaries. Otherwise falls back
+ * to title + URL only.
  *
  * @param {chrome.tabs.Tab} tab
  * @returns {Promise<{ summary: string, summaryType: 'ai'|'fallback' }>}
@@ -722,7 +810,18 @@ async function summarizeTab(tab) {
   const title = tab.title || 'Untitled';
   const url = tab.url || '';
 
-  const prompt = `Summarize this page in 3 bullet points (total under 100 words), preserving key facts, numbers, dates, action items, and the user's likely intent for visiting.\n\nTitle: ${title}\nURL: ${url}`;
+  // Build richer context if the user opted in to page analysis
+  let pageContext = `Title: ${title}\nURL: ${url}`;
+  const { config } = await chrome.storage.local.get('config');
+  if (config?.enableRichPageAnalysis && await hasPageAccess()) {
+    const content = await extractTabContent(tab.id);
+    if (content) {
+      if (content.metaDescription) pageContext += `\nDescription: ${content.metaDescription}`;
+      if (content.excerpt) pageContext += `\nContent: ${content.excerpt.substring(0, 500)}`;
+    }
+  }
+
+  const prompt = `Summarize this page in 3 bullet points (total under 100 words), preserving key facts, numbers, dates, action items, and the user's likely intent for visiting.\n\n${pageContext}`;
 
   const aiResult = await promptAi(prompt);
   if (aiResult) {

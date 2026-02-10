@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Sunday Digest (digest.js)
- * @version 1.4.0
+ * @version 1.5.0
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups

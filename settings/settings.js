@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.4.0
+ * @version 1.5.0
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   bindToggle('enable-clustering', cfg.enableThematicClustering ?? false);
   bindToggle('high-contrast', cfg.highContrastMode ?? false);
+
+  // Rich page analysis — permission-gated, handled separately from normal toggles
+  await initRichAnalysisToggle(cfg.enableRichPageAnalysis ?? false);
 
   // Topic grouping controls
   bindToggle('enable-topic-grouping', cfg.enableTopicGrouping ?? false);
@@ -99,6 +102,78 @@ function updateOvernightInteractivity() {
   intervalSelect.classList.toggle('field-select--disabled', isOvernight);
 }
 
+// ─── Rich Page Analysis (Permission-Gated Toggle) ────────────────
+
+const RICH_ANALYSIS_PERMS = {
+  permissions: ['scripting'],
+  origins: ['<all_urls>'],
+};
+
+/**
+ * Initialize the rich page analysis toggle.
+ * Checks actual granted permissions to set correct initial state —
+ * the config value alone isn't trustworthy because the user could have
+ * revoked permissions from chrome://extensions.
+ */
+async function initRichAnalysisToggle(configValue) {
+  const btn = document.getElementById('enable-rich-analysis');
+  const statusEl = document.getElementById('rich-analysis-status');
+  if (!btn) return;
+
+  // Check if permissions are actually granted (user may have revoked externally)
+  const hasPermission = await chrome.permissions.contains(RICH_ANALYSIS_PERMS);
+  const enabled = configValue && hasPermission;
+
+  btn.setAttribute('aria-checked', String(enabled));
+
+  // If config says enabled but permission is revoked, fix the drift
+  if (configValue && !hasPermission) {
+    showRichAnalysisStatus('Permission was revoked — re-enable to restore rich analysis.', 'warning');
+  }
+
+  btn.addEventListener('click', async () => {
+    const current = btn.getAttribute('aria-checked') === 'true';
+
+    if (current) {
+      // Turning OFF — revoke permissions
+      try {
+        await chrome.permissions.remove(RICH_ANALYSIS_PERMS);
+        btn.setAttribute('aria-checked', 'false');
+        showRichAnalysisStatus('Rich page analysis disabled. Permissions revoked.', 'info');
+        saveConfig();
+      } catch (err) {
+        showRichAnalysisStatus('Could not revoke permissions: ' + err.message, 'error');
+      }
+    } else {
+      // Turning ON — request permissions (Chrome shows its own dialog)
+      try {
+        const granted = await chrome.permissions.request(RICH_ANALYSIS_PERMS);
+        if (granted) {
+          btn.setAttribute('aria-checked', 'true');
+          showRichAnalysisStatus('Rich page analysis enabled. Closure can now read page content for better grouping and summaries.', 'success');
+          saveConfig();
+        } else {
+          showRichAnalysisStatus('Permission denied. Rich page analysis requires access to page content.', 'warning');
+        }
+      } catch (err) {
+        showRichAnalysisStatus('Permission request failed: ' + err.message, 'error');
+      }
+    }
+  });
+}
+
+function showRichAnalysisStatus(message, type) {
+  const el = document.getElementById('rich-analysis-status');
+  if (!el) return;
+  el.textContent = message;
+  el.hidden = false;
+  el.className = `rich-analysis-status rich-analysis-status--${type}`;
+  // Auto-hide success/info after 5 seconds
+  if (type === 'success' || type === 'info') {
+    setTimeout(() => { el.hidden = true; }, 5000);
+  }
+}
+
 // ─── Toggle Switch Binding ────────────────────────────────────────
 
 function bindToggle(buttonId, initialValue) {
@@ -134,6 +209,7 @@ async function saveConfig() {
     groupThreshold: parseInt(document.getElementById('group-threshold')?.value, 10) || 3,
     idleThresholdHours: parseInt(document.getElementById('idle-threshold')?.value, 10) || 24,
     enableThematicClustering: document.getElementById('enable-clustering')?.getAttribute('aria-checked') === 'true',
+    enableRichPageAnalysis: document.getElementById('enable-rich-analysis')?.getAttribute('aria-checked') === 'true',
     enableTopicGrouping: document.getElementById('enable-topic-grouping')?.getAttribute('aria-checked') === 'true',
     topicGroupingIntervalMinutes: parseInt(document.getElementById('topic-grouping-interval')?.value, 10) || 120,
     topicGroupingOvernightOnly: document.getElementById('topic-grouping-overnight')?.getAttribute('aria-checked') === 'true',
