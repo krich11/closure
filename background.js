@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.6.1
+ * @version 1.6.2
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -287,6 +287,9 @@ async function evaluateAutoGroup(triggerTab) {
     if (ungroupedIds.length > 0) {
       await chrome.tabs.group({ tabIds: ungroupedIds, groupId: existingGroup.id });
     }
+
+    // Move the group to the leftmost position (after pinned tabs)
+    await moveGroupToLeft(existingGroup.id);
   } else {
     // Create a new group from all same-domain tabs
     const tabIds = sameDomainTabs.map((t) => t.id);
@@ -298,6 +301,32 @@ async function evaluateAutoGroup(triggerTab) {
       color: GROUP_COLORS[colorIndex],
       collapsed: true,
     });
+
+    // Move the new group to the leftmost position (after pinned tabs)
+    await moveGroupToLeft(groupId);
+  }
+}
+
+/**
+ * Move a tab group to the leftmost position in its window, right after
+ * any pinned tabs. This keeps all groups clustered on the left side of
+ * the tab strip with ungrouped tabs to the right.
+ *
+ * @param {number} groupId
+ */
+async function moveGroupToLeft(groupId) {
+  try {
+    const groupTabs = await chrome.tabs.query({ groupId });
+    if (groupTabs.length === 0) return;
+
+    const windowId = groupTabs[0].windowId;
+    const pinnedTabs = await chrome.tabs.query({ windowId, pinned: true });
+    const targetIndex = pinnedTabs.length; // first position after pinned tabs
+
+    await chrome.tabGroups.move(groupId, { index: targetIndex });
+  } catch (err) {
+    // Group may have been removed between query and move — that's fine
+    console.debug('[Closure] moveGroupToLeft error:', err.message);
   }
 }
 
@@ -475,6 +504,7 @@ async function runTopicGrouping({ manual = false } = {}) {
         color: GROUP_COLORS[colorIndex],
         collapsed: true,
       });
+      await moveGroupToLeft(groupId);
       console.debug(`[Closure:TopicGroup] Created group "${cluster.title.toUpperCase()}" with ${validIds.length} tabs (color: ${GROUP_COLORS[colorIndex]})`);
     } catch (err) {
       console.error('[Closure:TopicGroup] Group creation error:', err);

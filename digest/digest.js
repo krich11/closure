@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Memory Lane (digest.js)
- * @version 1.6.1
+ * @version 1.6.2
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
