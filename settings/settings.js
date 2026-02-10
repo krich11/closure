@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.2.2
+ * @version 1.2.3
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cfg = config || {};
 
   bindRangeSlider('group-threshold', 'group-threshold-value', cfg.groupThreshold ?? 3, formatInt);
-  bindRangeSlider('collapse-hours', 'collapse-hours-value', cfg.collapseAfterHours ?? 3, v => `${v}h`);
   bindRangeSlider('idle-threshold', 'idle-threshold-value', cfg.idleThresholdHours ?? 24, v => `${v}h`);
 
   bindToggle('enable-clustering', cfg.enableThematicClustering ?? false);
@@ -76,7 +75,6 @@ function bindToggle(buttonId, initialValue) {
 async function saveConfig() {
   const newConfig = {
     groupThreshold: parseInt(document.getElementById('group-threshold')?.value, 10) || 3,
-    collapseAfterHours: parseInt(document.getElementById('collapse-hours')?.value, 10) || 3,
     idleThresholdHours: parseInt(document.getElementById('idle-threshold')?.value, 10) || 24,
     enableThematicClustering: document.getElementById('enable-clustering')?.getAttribute('aria-checked') === 'true',
     highContrastMode: document.getElementById('high-contrast')?.getAttribute('aria-checked') === 'true',

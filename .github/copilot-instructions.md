@@ -66,7 +66,6 @@ Use a consistent, versioned schema in `chrome.storage.local`:
   "config": {
     "groupThreshold": 3,          // 3–10, default 3
     "idleThresholdHours": 24,     // 4–168, default 24
-    "collapseAfterHours": 3,      // hours before auto-collapse
     "whitelist": [],               // array of domain strings
     "enableThematicClustering": false,
     "highContrastMode": false
@@ -102,7 +101,7 @@ Always migrate data forward when bumping `schema_version`.
 - Extract root domain with `new URL(tab.url).hostname` — strip `www.` prefix for grouping.
 - Use `chrome.tabGroups` API for creation, naming (UPPERCASED domain), and color assignment.
 - Maintain a deterministic domain → color mapping so colors are stable across sessions. Use the 9 available `chrome.tabGroups.Color` values and cycle.
-- Auto-collapse: set an alarm per group; on fire, call `chrome.tabGroups.update({ collapsed: true })`.
+- Groups are created already collapsed — the whole point is reducing visual clutter immediately.
 - Never group pinned tabs.
 
 ### 2. Dead End Sweeper (Error Management)

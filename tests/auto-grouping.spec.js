@@ -222,14 +222,13 @@ test.describe('Clean Slate Automator — Auto-Grouping', () => {
     expect(groups.length).toBe(0);
   });
 
-  test('auto-collapse alarm is scheduled when a group is created', async ({ context, extensionId }) => {
+  test('group is collapsed immediately when created', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
     await page.evaluate(async () => {
       const { config } = await chrome.storage.local.get('config');
       config.groupThreshold = 3;
-      config.collapseAfterHours = 3;
       await chrome.storage.local.set({ config });
     });
 
@@ -241,19 +240,14 @@ test.describe('Clean Slate Automator — Auto-Grouping', () => {
     }
     await page.waitForTimeout(2000);
 
-    // Get the created group ID
+    // Get the created group
     const group = await page.evaluate(async () => {
       const groups = await chrome.tabGroups.query({ title: 'EXAMPLE.COM' });
       return groups[0] || null;
     });
     expect(group).toBeTruthy();
 
-    // Verify collapse alarm was created for this group
-    const alarm = await page.evaluate(async (groupId) => {
-      return chrome.alarms.get(`collapse-group-${groupId}`);
-    }, group.id);
-
-    expect(alarm).toBeTruthy();
-    expect(alarm.name).toBe(`collapse-group-${group.id}`);
+    // Group should be collapsed immediately
+    expect(group.collapsed).toBe(true);
   });
 });

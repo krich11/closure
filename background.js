@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.2.2
+ * @version 1.2.3
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -12,7 +12,6 @@
 const DEFAULT_CONFIG = {
   groupThreshold: 3,
   idleThresholdHours: 24,
-  collapseAfterHours: 3,
   whitelist: [],
   enableThematicClustering: false,
   highContrastMode: false,
@@ -169,11 +168,8 @@ async function evaluateAutoGroup(triggerTab) {
     await chrome.tabGroups.update(groupId, {
       title: domain.toUpperCase(),
       color: GROUP_COLORS[colorIndex],
-      collapsed: false,
+      collapsed: true,
     });
-
-    // Schedule auto-collapse alarm
-    scheduleCollapseAlarm(groupId, config?.collapseAfterHours ?? DEFAULT_CONFIG.collapseAfterHours);
   }
 }
 
@@ -186,32 +182,7 @@ async function findExistingGroup(domain) {
   return groups.length > 0 ? groups[0] : null;
 }
 
-// ─── Auto-Collapse ──────────────────────────────────────────────
 
-const COLLAPSE_ALARM_PREFIX = 'collapse-group-';
-
-/**
- * Create a one-shot alarm that fires after `hours` to collapse the group.
- */
-function scheduleCollapseAlarm(groupId, hours) {
-  const alarmName = `${COLLAPSE_ALARM_PREFIX}${groupId}`;
-  chrome.alarms.create(alarmName, { delayInMinutes: hours * 60 });
-}
-
-/**
- * Handle collapse alarms. Collapses the referenced group if it still exists.
- */
-async function handleCollapseAlarm(alarmName) {
-  const groupIdStr = alarmName.replace(COLLAPSE_ALARM_PREFIX, '');
-  const groupId = parseInt(groupIdStr, 10);
-  if (isNaN(groupId)) return;
-
-  try {
-    await chrome.tabGroups.update(groupId, { collapsed: true });
-  } catch {
-    // Group may have been closed already — ignore
-  }
-}
 
 // ─── Dead End Sweeper ───────────────────────────────────────────
 
@@ -906,11 +877,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 // Alarm handler — route to the correct feature
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name.startsWith(COLLAPSE_ALARM_PREFIX)) {
-    await handleCollapseAlarm(alarm.name);
-    return;
-  }
-
   if (alarm.name === SWEEP_ALARM_NAME) {
     await runDeadEndSweep();
     return;

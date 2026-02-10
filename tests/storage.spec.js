@@ -105,8 +105,5 @@ test.describe('Storage Schema', () => {
     // idleThresholdHours: 4–168, default 24
     expect(config.idleThresholdHours).toBeGreaterThanOrEqual(4);
     expect(config.idleThresholdHours).toBeLessThanOrEqual(168);
-
-    // collapseAfterHours: positive number
-    expect(config.collapseAfterHours).toBeGreaterThan(0);
   });
 });

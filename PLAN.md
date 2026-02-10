@@ -1,4 +1,4 @@
-# Closure Plan — v1.2.2
+# Closure Plan — v1.2.3
 
 ## Goal
 
@@ -8,7 +8,7 @@ Implement a privacy-first Chromium extension (MV3) that tidies tabs, archives id
 
 Phase 3 (The Soul) is complete:
 - ✅ Storage schema initialization + migration scaffold
-- ✅ Clean Slate Automator (auto-grouping) with deterministic colors + auto-collapse
+- ✅ Clean Slate Automator (auto-grouping) with deterministic colors + immediate collapse
 - ✅ Safety net: pinned/audible immunity + whitelist enforcement
 - ✅ Zen Popup with status ring, tab count, nuclear archive, settings link
 - ✅ Sunday Digest with domain grouping, recency sorting, thematic clustering, restore
@@ -102,7 +102,7 @@ Files not yet created: none — all pages implemented.
 | `tabs` | Read tab metadata (`lastAccessed`, `audible`, `pinned`, URLs), close/archive tabs, detect activity for grouping and sweeps | All windows | Always (core functionality) |
 | `tabGroups` | Create, update, and collapse tab groups for Clean Slate Automator | All windows | Always |
 | `storage` | Persist config, archived entries, sweep history, and stats | Local only (`chrome.storage.local`) | Always |
-| `alarms` | Schedule periodic sweeps (60 min), auto-collapse, idle checks | Service worker | Always |
+| `alarms` | Schedule periodic sweeps (60 min), idle checks | Service worker | Always |
 | `notifications` | Notify when tabs are archived to Sunday Digest | User-visible | Always (passive only) |
 | `scripting` | Inject content scripts for extraction, error detection, Stay of Execution overlay | Per-tab on demand | Always (gated by feature activation) |
 
@@ -116,7 +116,6 @@ No `host_permissions` — content scripts are injected programmatically via `chr
   "config": {
     "groupThreshold": 3,          // 3–10, default 3
     "idleThresholdHours": 24,     // 4–168, default 24
-    "collapseAfterHours": 3,      // hours before auto-collapse
     "whitelist": [],               // array of domain strings
     "enableThematicClustering": false,
     "highContrastMode": false

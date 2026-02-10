@@ -26,7 +26,6 @@ test.describe('Extension Initialization', () => {
     expect(storageData.config).toBeDefined();
     expect(storageData.config.groupThreshold).toBe(3);
     expect(storageData.config.idleThresholdHours).toBe(24);
-    expect(storageData.config.collapseAfterHours).toBe(3);
     expect(storageData.config.whitelist).toEqual([]);
     expect(storageData.archived).toEqual([]);
     expect(storageData.swept).toEqual([]);

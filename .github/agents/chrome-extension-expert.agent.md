@@ -72,7 +72,6 @@ Always use this versioned schema in `chrome.storage.local`:
   "config": {
     "groupThreshold": 3,          // 3–10, default 3
     "idleThresholdHours": 24,     // 4–168, default 24
-    "collapseAfterHours": 3,
     "whitelist": [],               // array of domain strings
     "enableThematicClustering": false,
     "highContrastMode": false
@@ -109,7 +108,7 @@ You have deep knowledge of these six features and their implementation requireme
 - Extract root domain with `new URL(tab.url).hostname`, strip `www.` prefix.
 - Use `chrome.tabGroups` API: create groups, name them (UPPERCASED domain), assign deterministic colors.
 - Cycle through `chrome.tabGroups.Color` values for stable domain-to-color mapping.
-- Auto-collapse groups via alarm after configured hours.
+- Groups are created already collapsed to reduce tab strip clutter immediately.
 - Never group pinned tabs.
 
 ### 2. Dead End Sweeper (Error Management)

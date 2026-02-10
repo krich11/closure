@@ -21,10 +21,6 @@ test.describe('Settings Page — Slider Controls', () => {
     const idleThreshold = await page.locator('#idle-threshold').inputValue();
     expect(Number(idleThreshold)).toBeGreaterThanOrEqual(4);
     expect(Number(idleThreshold)).toBeLessThanOrEqual(168);
-
-    const collapseHours = await page.locator('#collapse-hours').inputValue();
-    expect(Number(collapseHours)).toBeGreaterThanOrEqual(1);
-    expect(Number(collapseHours)).toBeLessThanOrEqual(24);
   });
 
   test('changing group threshold saves to storage', async ({ context, extensionId }) => {
@@ -61,23 +57,6 @@ test.describe('Settings Page — Slider Controls', () => {
     });
 
     expect(config.idleThresholdHours).toBe(48);
-  });
-
-  test('changing collapse hours saves to storage', async ({ context, extensionId }) => {
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
-    await page.waitForLoadState('domcontentloaded');
-
-    await page.locator('#collapse-hours').fill('8');
-    await page.locator('#collapse-hours').dispatchEvent('change');
-    await page.waitForTimeout(500);
-
-    const config = await page.evaluate(async () => {
-      const data = await chrome.storage.local.get('config');
-      return data.config;
-    });
-
-    expect(config.collapseAfterHours).toBe(8);
   });
 
   test('slider output label updates on input', async ({ context, extensionId }) => {

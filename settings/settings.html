@@ -20,36 +20,27 @@
       <!-- Auto-Grouping -->
       <section class="settings-section" aria-labelledby="section-grouping">
         <h2 id="section-grouping" class="section-title">Clean Slate Automator</h2>
-        <p class="section-desc">Tabs from the same domain are grouped together when the count reaches this threshold.</p>
+        <p class="section-desc">When you open several tabs from the same site (e.g. 3 github.com tabs), they're automatically grouped and collapsed into a single labeled tab. Click the label to expand and see the tabs inside.</p>
 
         <div class="field">
           <label for="group-threshold" class="field-label">
             Group threshold
-            <span class="field-hint">Tabs needed before auto-grouping (3–10)</span>
+            <span class="field-hint">How many tabs from the same site before they're grouped (3–10)</span>
           </label>
           <input type="range" id="group-threshold" min="3" max="10" step="1" value="3" aria-valuemin="3" aria-valuemax="10">
           <output id="group-threshold-value" class="range-output" for="group-threshold">3</output>
-        </div>
-
-        <div class="field">
-          <label for="collapse-hours" class="field-label">
-            Auto-collapse after
-            <span class="field-hint">Hours before a group collapses (1–24)</span>
-          </label>
-          <input type="range" id="collapse-hours" min="1" max="24" step="1" value="3" aria-valuemin="1" aria-valuemax="24">
-          <output id="collapse-hours-value" class="range-output" for="collapse-hours">3h</output>
         </div>
       </section>
 
       <!-- Graceful Exit -->
       <section class="settings-section" aria-labelledby="section-idle">
         <h2 id="section-idle" class="section-title">Graceful Exit</h2>
-        <p class="section-desc">Idle tabs are summarized and archived to your Sunday Digest after this threshold.</p>
+        <p class="section-desc">Tabs you haven't touched in a while are archived: their content is summarized by on-device AI, then the tab is closed. You'll get a "Stay of Execution" warning 10 minutes before, and everything is saved to your Sunday Digest.</p>
 
         <div class="field">
           <label for="idle-threshold" class="field-label">
             Idle threshold
-            <span class="field-hint">Hours before a tab is considered idle (4–168)</span>
+            <span class="field-hint">Hours of inactivity before a tab is archived (4–168, i.e. up to 1 week)</span>
           </label>
           <input type="range" id="idle-threshold" min="4" max="168" step="4" value="24" aria-valuemin="4" aria-valuemax="168">
           <output id="idle-threshold-value" class="range-output" for="idle-threshold">24h</output>
@@ -59,12 +50,12 @@
       <!-- AI & Clustering -->
       <section class="settings-section" aria-labelledby="section-ai">
         <h2 id="section-ai" class="section-title">AI Features</h2>
-        <p class="section-desc">Powered entirely by on-device AI. No data ever leaves your machine.</p>
+        <p class="section-desc">Closure uses Chrome's built-in Gemini Nano to summarize tabs before archiving them, and optionally to cluster your archived tabs by topic. Everything runs 100% on your device — no data ever leaves your machine.</p>
 
         <div class="field field-toggle">
           <label for="enable-clustering" class="field-label">
             Thematic clustering
-            <span class="field-hint">Group archived tabs by topic in Sunday Digest</span>
+            <span class="field-hint">In Sunday Digest, re-group archived tabs by topic instead of domain — e.g. tabs from different sites about "React performance" are clustered together</span>
           </label>
           <button id="enable-clustering" class="toggle" role="switch" aria-checked="false" type="button">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -95,7 +86,7 @@
       <!-- Whitelist -->
       <section class="settings-section" aria-labelledby="section-whitelist">
         <h2 id="section-whitelist" class="section-title">Whitelist</h2>
-        <p class="section-desc">Domains on this list are immune to grouping, sweeping, and archival.</p>
+        <p class="section-desc">Domains listed here are completely hands-off — Closure won't group, sweep, or archive any tab from these sites. Use this for sites you always want open, like email or chat.</p>
 
         <div class="field">
           <label for="whitelist-input" class="field-label sr-only">Add domain to whitelist</label>
@@ -119,7 +110,7 @@
         <div class="field field-toggle">
           <label for="high-contrast" class="field-label">
             High-contrast mode
-            <span class="field-hint">Increases contrast for better readability</span>
+            <span class="field-hint">Boosts text and UI contrast across all Closure pages for better readability</span>
           </label>
           <button id="high-contrast" class="toggle" role="switch" aria-checked="false" type="button">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -143,7 +134,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.2.2 — 100% local, 100% private.</p>
+      <p>Closure v1.2.3 — 100% local, 100% private.</p>
     </footer>
   </div>
 
