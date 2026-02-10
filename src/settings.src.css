@@ -177,6 +177,20 @@
     background: color-mix(in srgb, var(--color-warm) 10%, var(--color-bg));
   }
 
+  .chrome-link {
+    @apply text-warm no-underline cursor-pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  .chrome-link:hover {
+    @apply underline;
+    opacity: 0.85;
+  }
+
+  .chrome-link code {
+    @apply cursor-pointer;
+  }
+
   .ai-setup-note {
     @apply mt-3 text-xs italic text-ink-muted;
   }

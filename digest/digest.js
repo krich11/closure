@@ -181,12 +181,13 @@ function setupEventListeners() {
     }
   });
 
-  // Cluster button — enable when window.ai is available
+  // Cluster button — enable when AI is available (try new LanguageModel global, then legacy window.ai)
   const clusterBtn = document.getElementById('cluster-btn');
   const aiHint = document.getElementById('ai-hint');
   const aiHintLink = document.getElementById('ai-hint-link');
   if (clusterBtn) {
-    if (typeof window.ai !== 'undefined' && window.ai) {
+    const aiReady = await isAiAvailable();
+    if (aiReady) {
       clusterBtn.disabled = false;
       if (aiHint) aiHint.hidden = true;
       clusterBtn.addEventListener('click', async () => {
@@ -200,7 +201,7 @@ function setupEventListeners() {
         }
       });
     } else {
-      // Show the AI hint when window.ai is unavailable
+      // Show the AI hint when AI is unavailable
       if (aiHint) aiHint.hidden = false;
       if (aiHintLink) {
         aiHintLink.addEventListener('click', (e) => {
@@ -225,7 +226,37 @@ function setupSortControl() {
 }
 
 /**
- * Attempt thematic clustering of archived entries via window.ai.
+ * Check if on-device AI is available (new LanguageModel global or legacy window.ai).
+ */
+async function isAiAvailable() {
+  try {
+    if (typeof LanguageModel !== 'undefined') {
+      const availability = await LanguageModel.availability();
+      return availability === 'available' || availability === 'readily';
+    }
+    if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
+      const capabilities = await window.ai.languageModel.capabilities();
+      return capabilities.available === 'readily';
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
+/**
+ * Create an AI language model session (new API or legacy fallback).
+ */
+async function createAiSession() {
+  if (typeof LanguageModel !== 'undefined') {
+    return await LanguageModel.create();
+  }
+  if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
+    return await window.ai.languageModel.create();
+  }
+  throw new Error('AI not available');
+}
+
+/**
+ * Attempt thematic clustering of archived entries via on-device AI.
  * Re-renders the feed grouped by AI-suggested themes instead of domain.
  */
 async function clusterByTheme() {
@@ -238,7 +269,7 @@ async function clusterByTheme() {
   ).join('\n');
 
   try {
-    const session = await window.ai.languageModel.create();
+    const session = await createAiSession();
     const prompt = `Group these summaries into thematic clusters and suggest short cluster titles. Return JSON: { "clusters": [{ "title": "...", "indices": [0, 1, ...] }] }\n\n${summaries}`;
     const result = await session.prompt(prompt);
     session.destroy();

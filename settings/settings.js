@@ -113,21 +113,36 @@ async function checkAiAvailability() {
   let aiAvailable = false;
 
   try {
-    if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
+    // Try the new global LanguageModel API (Chrome 138+), then fall back to legacy window.ai
+    if (typeof LanguageModel !== 'undefined') {
+      const availability = await LanguageModel.availability();
+      if (availability === 'available' || availability === 'readily') {
+        statusEl.textContent = 'On-device AI is available and ready.';
+        statusEl.className = 'ai-status ai-status--available';
+        aiAvailable = true;
+      } else if (availability === 'downloadable' || availability === 'after-download' || availability === 'downloading') {
+        statusEl.textContent = 'On-device AI model needs to download first. Open chrome://components and click "Check for update" on Optimization Guide On Device Model.';
+        statusEl.className = 'ai-status ai-status--pending';
+      } else {
+        statusEl.textContent = 'On-device AI is not available. Summaries will use fallback text.';
+        statusEl.className = 'ai-status ai-status--unavailable';
+      }
+    } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
+      // Legacy API fallback
       const capabilities = await window.ai.languageModel.capabilities();
       if (capabilities.available === 'readily') {
         statusEl.textContent = 'On-device AI is available and ready.';
         statusEl.className = 'ai-status ai-status--available';
         aiAvailable = true;
       } else if (capabilities.available === 'after-download') {
-        statusEl.textContent = 'On-device AI model is available but needs to download first. Visit chrome://components to trigger the download.';
+        statusEl.textContent = 'On-device AI model needs to download first. Open chrome://components and click "Check for update" on Optimization Guide On Device Model.';
         statusEl.className = 'ai-status ai-status--pending';
       } else {
         statusEl.textContent = 'On-device AI is not available. Summaries will use fallback text.';
         statusEl.className = 'ai-status ai-status--unavailable';
       }
     } else {
-      statusEl.textContent = 'On-device AI is not available in this browser. Summaries will use fallback text.';
+      statusEl.textContent = 'On-device AI is not available in this browser. Requires Chrome 138+. Summaries will use fallback text.';
       statusEl.className = 'ai-status ai-status--unavailable';
     }
   } catch {
@@ -139,6 +154,25 @@ async function checkAiAvailability() {
   if (guideEl) {
     guideEl.hidden = aiAvailable;
   }
+
+  // Wire up chrome:// link click handlers
+  setupChromeLinks();
+}
+
+/**
+ * Make chrome:// URLs clickable by opening them via chrome.tabs.create.
+ * Regular <a> links to chrome:// are blocked by the browser.
+ */
+function setupChromeLinks() {
+  document.querySelectorAll('.chrome-link').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const url = link.getAttribute('data-url');
+      if (url) {
+        chrome.tabs.create({ url });
+      }
+    });
+  });
 }
 
 // ─── Whitelist Management ────────────────────────────────────────

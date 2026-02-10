@@ -587,28 +587,32 @@ async function summarizeContent(tab, content) {
 
 /**
  * Self-contained function injected into pages to run AI summarization.
- * Checks for window.ai availability and uses the specified prompt.
+ * Checks for LanguageModel global (Chrome 138+) or legacy window.ai.
  * Must have no references to outer scope.
  *
  * @param {string} title
  * @param {string} metaDescription
  * @param {string} text
- * @returns {Promise<{ summary: string, summaryType: 'ai'|'fallback' }>}
+ * @returns {Promise<{ summary: string, summaryType: 'ai'|'fallback' }|null>}
  */
 async function contentScriptSummarize(title, metaDescription, text) {
-  // Check window.ai availability
-  if (typeof window.ai === 'undefined' || !window.ai) {
-    return null; // Signal caller to use fallback
-  }
-
   try {
-    // Check for sufficient resources
-    const capabilities = await window.ai.languageModel?.capabilities?.();
-    if (capabilities?.available === 'no') {
-      return null;
+    let session;
+
+    // Try the new global LanguageModel API first (Chrome 138+)
+    if (typeof LanguageModel !== 'undefined') {
+      const availability = await LanguageModel.availability();
+      if (availability === 'unavailable') return null;
+      session = await LanguageModel.create();
+    } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
+      // Legacy fallback
+      const capabilities = await window.ai.languageModel.capabilities?.();
+      if (capabilities?.available === 'no') return null;
+      session = await window.ai.languageModel.create();
+    } else {
+      return null; // No AI available
     }
 
-    const session = await window.ai.languageModel.create();
     const pageContent = `Title: ${title}\nDescription: ${metaDescription}\nContent: ${text}`;
     const prompt = `Summarize this page in 3 bullet points (total under 100 words), preserving key facts, numbers, dates, action items, and the user's likely intent for visiting.\n\n${pageContent}`;
 
