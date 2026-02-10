@@ -1,10 +1,11 @@
 {
   "name": "closure",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Tab-Shame Absolution Engine — a privacy-first Chromium extension",
   "main": "background.js",
   "scripts": {
     "build:css": "npx @tailwindcss/cli -i src/popup.src.css -o popup/popup.css --minify && npx @tailwindcss/cli -i src/digest.src.css -o digest/digest.css --minify && npx @tailwindcss/cli -i src/settings.src.css -o settings/settings.css --minify && npx @tailwindcss/cli -i src/onboarding.src.css -o onboarding/onboarding.css --minify",
+    "version:sync": "node scripts/sync-version.js",
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
     "test:debug": "npx playwright test --debug",
