@@ -231,7 +231,7 @@ function setupSortControl() {
 async function isAiAvailable() {
   try {
     if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'] });
+      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
       return availability === 'available' || availability === 'readily';
     }
     if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {

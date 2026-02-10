@@ -115,7 +115,7 @@ async function checkAiAvailability() {
   try {
     // Try the new global LanguageModel API (Chrome 138+), then fall back to legacy window.ai
     if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'] });
+      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
       if (availability === 'available' || availability === 'readily') {
         statusEl.textContent = 'On-device AI is available and ready.';
         statusEl.className = 'ai-status ai-status--available';
