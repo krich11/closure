@@ -137,7 +137,7 @@ Always migrate data forward when bumping `schema_version`.
 - Each entry shows: favicon, title (linked to URL), summary bullets, timestamp.
 - "Restore Group" reopens all tabs in a domain/cluster group. "Restore Single Tab" reopens one.
 - Restored entries remain in history but are visually marked as restored.
-- Donation trigger at bottom: dynamic stat — `"You explored {n} topics this week. Your browser stayed clean. [Buy the Dev a Coffee]"`
+- Donation trigger at bottom: dynamic stat — `"You explored {n} topics this week. Your browser stayed clean. [Buy Me an Energy Drink]"`
 
 ### 5. Safety Net
 
@@ -184,7 +184,7 @@ Always migrate data forward when bumping `schema_version`.
 
 ## Donation Integration
 
-- Donation links point to a configurable URL (default: placeholder `https://buymeacoffee.com/closure`).
+- Donation links point to a configurable URL (default: `https://ko-fi.com/krich11`).
 - Never block features behind donation. Never nag.
 - Donation prompts appear only:
   1. Bottom of Sunday Digest.

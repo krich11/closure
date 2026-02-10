@@ -116,7 +116,7 @@ function showNuclearToast(count) {
     toast.innerHTML = `
       <p>Ah, silence — and you just reclaimed ~${ramText} RAM. Enjoy the focus.</p>
       <p class="toast-donate">This runs 100% locally. Support the code that keeps your privacy safe.</p>
-      <a href="https://buymeacoffee.com/closure" target="_blank" rel="noopener noreferrer" class="toast-link">Support Us</a>
+      <a href="https://ko-fi.com/krich11" target="_blank" rel="noopener noreferrer" class="toast-link">Support Us</a>
     `;
   } else {
     toast.innerHTML = `<p>${count} tab${count > 1 ? 's' : ''} archived. ~${ramText} RAM reclaimed.</p>`;

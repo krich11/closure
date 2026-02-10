@@ -144,7 +144,7 @@ test.describe('Privacy — Digest Page', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // The donation link should be a direct URL, no tracking params
-    const donationLink = page.locator('a[href*="buymeacoffee"]');
+    const donationLink = page.locator('a[href*="ko-fi"]');
     const href = await donationLink.getAttribute('href');
 
     // Should be a clean URL with no analytics/UTM params
@@ -184,7 +184,7 @@ test.describe('Privacy — Cross-Page Manifest Audit', () => {
     if (csp) {
       const cspStr = JSON.stringify(csp);
       expect(cspStr).not.toContain('http://');
-      // Allow https://buymeacoffee.com only in the manifest if it's a link, not in CSP
+      // Allow https://ko-fi.com only in the manifest if it's a link, not in CSP
       // CSP should not whitelist external script/connect sources
       expect(cspStr).not.toMatch(/connect-src.*https?:\/\/(?!self)/);
     }
