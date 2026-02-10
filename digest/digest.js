@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Memory Lane (digest.js)
- * @version 1.6.0
+ * @version 1.6.1
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -254,11 +254,14 @@ function setupSortControl() {
 async function isAiAvailable() {
   try {
     if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
-      return availability === 'available' || availability === 'readily';
+      const availability = await LanguageModel.availability({
+        expectedInputs: [{ type: 'text', languages: ['en'] }],
+        expectedOutputs: [{ type: 'text', languages: ['en'] }],
+      });
+      return availability !== 'unavailable';
     }
     if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
-      const capabilities = await window.ai.languageModel.capabilities({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+      const capabilities = await window.ai.languageModel.capabilities();
       return capabilities.available === 'readily';
     }
   } catch { /* ignore */ }
@@ -270,10 +273,13 @@ async function isAiAvailable() {
  */
 async function createAiSession() {
   if (typeof LanguageModel !== 'undefined') {
-    return await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+    return await LanguageModel.create({
+      expectedInputs: [{ type: 'text', languages: ['en'] }],
+      expectedOutputs: [{ type: 'text', languages: ['en'] }],
+    });
   }
   if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
-    return await window.ai.languageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+    return await window.ai.languageModel.create();
   }
   throw new Error('AI not available');
 }

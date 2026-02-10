@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.6.0
+ * @version 1.6.1
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -275,7 +275,10 @@ async function checkAiAvailability() {
   try {
     // Try the new global LanguageModel API (Chrome 138+), then fall back to legacy window.ai
     if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+      const availability = await LanguageModel.availability({
+        expectedInputs: [{ type: 'text', languages: ['en'] }],
+        expectedOutputs: [{ type: 'text', languages: ['en'] }],
+      });
       if (availability === 'available' || availability === 'readily') {
         statusEl.textContent = 'On-device AI is available and ready.';
         statusEl.className = 'ai-status ai-status--available';
@@ -290,7 +293,7 @@ async function checkAiAvailability() {
       }
     } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
       // Legacy API fallback
-      const capabilities = await window.ai.languageModel.capabilities({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+      const capabilities = await window.ai.languageModel.capabilities();
       if (capabilities.available === 'readily') {
         statusEl.textContent = 'On-device AI is available and ready.';
         statusEl.className = 'ai-status ai-status--available';
@@ -339,8 +342,8 @@ function showDownloadButton() {
 
     try {
       const session = await LanguageModel.create({
-        expectedInputLanguages: ['en'],
-        outputLanguage: 'en',
+        expectedInputs: [{ type: 'text', languages: ['en'] }],
+        expectedOutputs: [{ type: 'text', languages: ['en'] }],
         monitor(m) {
           m.addEventListener('downloadprogress', (e) => {
             const pct = Math.round((e.loaded / e.total) * 100);

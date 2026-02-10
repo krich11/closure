@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Popup script (popup.js)
- * @version 1.6.0
+ * @version 1.6.1
  */
 
 document.addEventListener('DOMContentLoaded', async () => {

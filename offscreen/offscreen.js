@@ -32,30 +32,24 @@ async function handleAiPrompt(prompt) {
   if (typeof LanguageModel !== 'undefined') {
     console.debug('[Closure:Offscreen] Using LanguageModel API');
     const availability = await LanguageModel.availability({
-      expectedInputLanguages: ['en'],
-      outputLanguage: 'en',
+      expectedInputs: [{ type: 'text', languages: ['en'] }],
+      expectedOutputs: [{ type: 'text', languages: ['en'] }],
     });
     console.debug('[Closure:Offscreen] Availability:', availability);
     if (availability === 'unavailable') {
       throw new Error('AI unavailable');
     }
     session = await LanguageModel.create({
-      expectedInputLanguages: ['en'],
-      outputLanguage: 'en',
+      expectedInputs: [{ type: 'text', languages: ['en'] }],
+      expectedOutputs: [{ type: 'text', languages: ['en'] }],
     });
   } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
     console.debug('[Closure:Offscreen] Using legacy window.ai API');
-    const capabilities = await window.ai.languageModel.capabilities?.({
-      expectedInputLanguages: ['en'],
-      outputLanguage: 'en',
-    });
+    const capabilities = await window.ai.languageModel.capabilities?.();
     if (capabilities?.available === 'no') {
       throw new Error('AI unavailable (legacy)');
     }
-    session = await window.ai.languageModel.create({
-      expectedInputLanguages: ['en'],
-      outputLanguage: 'en',
-    });
+    session = await window.ai.languageModel.create();
   } else {
     throw new Error('No AI API available');
   }
