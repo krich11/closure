@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.6.2
+ * @version 1.7.0
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -230,12 +230,38 @@ function domainToColorIndex(domain) {
 }
 
 /**
- * Check whether a domain is whitelisted.
+ * Check whether a hostname is whitelisted.
+ * Walks up the domain hierarchy so that whitelisting "github.com"
+ * also covers "gist.github.com", "docs.github.com", etc.
+ * Accepts the full tab hostname (e.g. "mail.google.com") so that
+ * subdomain-specific entries are honoured before domain collapsing.
  */
-async function isDomainWhitelisted(domain) {
+async function isDomainWhitelisted(hostname) {
   const { config } = await chrome.storage.local.get('config');
   const whitelist = config?.whitelist ?? [];
-  return whitelist.includes(domain);
+  if (whitelist.length === 0) return false;
+
+  const host = hostname.replace(/^www\./, '');
+  const parts = host.split('.');
+  // Check each level: "mail.google.com" → "mail.google.com", "google.com"
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (whitelist.includes(parts.slice(i).join('.'))) return true;
+  }
+  return false;
+}
+
+/**
+ * Extract the full hostname from a tab URL, stripping www.
+ * Returns null for non-http(s) URLs.
+ */
+function getHostname(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return parsed.hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
 }
 
 // ─── Clean Slate Automator ──────────────────────────────────────
@@ -261,8 +287,9 @@ async function evaluateAutoGroup(triggerTab) {
   const domain = getRootDomain(triggerTab.url);
   if (!domain) return;
 
-  // Guard: skip whitelisted domains
-  if (await isDomainWhitelisted(domain)) return;
+  // Guard: skip whitelisted domains (check full hostname for subdomain entries)
+  const hostname = getHostname(triggerTab.url);
+  if (hostname && await isDomainWhitelisted(hostname)) return;
 
   const { config } = await chrome.storage.local.get('config');
   const threshold = config?.groupThreshold ?? DEFAULT_CONFIG.groupThreshold;
@@ -373,7 +400,8 @@ async function runTopicGrouping({ manual = false } = {}) {
     if (tab.audible) continue;           // audible immunity
     const domain = getRootDomain(tab.url);
     if (!domain) continue;               // non-http
-    if (await isDomainWhitelisted(domain)) continue;
+    const hostname = getHostname(tab.url);
+    if (hostname && await isDomainWhitelisted(hostname)) continue;
     candidates.push(tab);
   }
 
@@ -654,8 +682,9 @@ async function runDeadEndSweep() {
         continue;
       }
 
-      // Skip whitelisted domains
-      if (await isDomainWhitelisted(domain)) continue;
+      // Skip whitelisted domains (check full hostname for subdomain entries)
+      const hostname = getHostname(tab.url);
+      if (hostname && await isDomainWhitelisted(hostname)) continue;
 
       // Attempt error detection
       const errorResult = await detectTabError(tab);
@@ -823,8 +852,9 @@ async function runIdleTabCheck() {
     const domain = getRootDomain(tab.url);
     if (!domain) continue;
 
-    // Skip whitelisted domains
-    if (await isDomainWhitelisted(domain)) continue;
+    // Skip whitelisted domains (check full hostname for subdomain entries)
+    const hostname = getHostname(tab.url);
+    if (hostname && await isDomainWhitelisted(hostname)) continue;
 
     // Skip snoozed tabs
     if (await isTabSnoozed(tab.id)) continue;
@@ -986,7 +1016,8 @@ async function handleNuclearArchive() {
 
     const domain = getRootDomain(tab.url);
     if (!domain) continue;
-    if (await isDomainWhitelisted(domain)) continue;
+    const hostname = getHostname(tab.url);
+    if (hostname && await isDomainWhitelisted(hostname)) continue;
     if (await isTabSnoozed(tab.id)) continue;
 
     const lastAccessed = tab.lastAccessed || now;

@@ -1,6 +1,6 @@
 {
   "name": "closure",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "description": "Tab-Shame Absolution Engine — a privacy-first Chromium extension",
   "main": "background.js",
   "scripts": {

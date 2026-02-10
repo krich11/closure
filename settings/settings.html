@@ -163,14 +163,15 @@
       <!-- Whitelist -->
       <section class="settings-section" aria-labelledby="section-whitelist">
         <h2 id="section-whitelist" class="section-title">Whitelist</h2>
-        <p class="section-desc">Domains listed here are completely hands-off — Closure won't group, sweep, or archive any tab from these sites. Use this for sites you always want open, like email or chat.</p>
+        <p class="section-desc">Domains listed here are completely hands-off — Closure won't group, sweep, or archive any tab from these sites. Subdomains are automatically covered (e.g. whitelisting <code>github.com</code> also protects <code>gist.github.com</code>). Drag to reorder.</p>
 
         <div class="field">
           <label for="whitelist-input" class="field-label sr-only">Add domain to whitelist</label>
           <div class="whitelist-input-row">
-            <input type="text" id="whitelist-input" placeholder="example.com" autocomplete="off" spellcheck="false">
+            <input type="text" id="whitelist-input" placeholder="example.com, localhost, 192.168.1.1" autocomplete="off" spellcheck="false">
             <button id="whitelist-add" class="btn btn-small" type="button" aria-label="Add domain to whitelist">Add</button>
           </div>
+          <p id="whitelist-error" class="whitelist-error" hidden></p>
         </div>
 
         <ul id="whitelist-entries" class="whitelist-list" aria-label="Whitelisted domains">
@@ -211,7 +212,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.6.2 — 100% local, 100% private.</p>
+      <p>Closure v1.7.0 — 100% local, 100% private.</p>
     </footer>
   </div>
 

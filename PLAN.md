@@ -1,4 +1,4 @@
-# Closure Plan — v1.6.2
+# Closure Plan — v1.7.0
 
 ## Goal
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.6.2
+ * @version 1.7.0
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -414,7 +414,9 @@ function appendWhitelistEntry(domain) {
 
   const li = document.createElement('li');
   li.className = 'whitelist-item';
+  li.draggable = true;
   li.innerHTML = `
+    <span class="whitelist-grip" aria-hidden="true">&#x2630;</span>
     <span class="whitelist-domain">${domain}</span>
     <button class="whitelist-remove" type="button" aria-label="Remove ${domain} from whitelist">&times;</button>
   `;
@@ -426,6 +428,59 @@ function appendWhitelistEntry(domain) {
     saveConfig();
   });
 
+  // ── Drag-and-drop reorder ──
+  li.addEventListener('dragstart', (e) => {
+    li.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    // Small delay so the dragging class applies visually before the ghost
+    requestAnimationFrame(() => li.style.opacity = '0.4');
+  });
+
+  li.addEventListener('dragend', () => {
+    li.classList.remove('dragging');
+    li.style.opacity = '';
+    // Remove any leftover drop indicators
+    listEl.querySelectorAll('.whitelist-item').forEach(el => {
+      el.classList.remove('drag-over-above', 'drag-over-below');
+    });
+    saveConfig();
+  });
+
+  li.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const dragging = listEl.querySelector('.dragging');
+    if (!dragging || dragging === li) return;
+
+    // Determine if cursor is in top or bottom half of the item
+    const rect = li.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const above = e.clientY < midY;
+
+    li.classList.toggle('drag-over-above', above);
+    li.classList.toggle('drag-over-below', !above);
+  });
+
+  li.addEventListener('dragleave', () => {
+    li.classList.remove('drag-over-above', 'drag-over-below');
+  });
+
+  li.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const dragging = listEl.querySelector('.dragging');
+    if (!dragging || dragging === li) return;
+
+    const rect = li.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      listEl.insertBefore(dragging, li);
+    } else {
+      listEl.insertBefore(dragging, li.nextSibling);
+    }
+
+    li.classList.remove('drag-over-above', 'drag-over-below');
+  });
+
   listEl.appendChild(li);
 }
 
@@ -434,18 +489,40 @@ function setupWhitelistInput() {
   const addBtn = document.getElementById('whitelist-add');
   if (!input || !addBtn) return;
 
+  const showError = (msg) => {
+    const errEl = document.getElementById('whitelist-error');
+    if (!errEl) return;
+    errEl.textContent = msg;
+    errEl.hidden = false;
+    setTimeout(() => { errEl.hidden = true; }, 3000);
+  };
+
   const addDomain = () => {
     const raw = input.value.trim().toLowerCase();
     if (!raw) return;
 
-    // Strip protocol if pasted
-    const domain = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+    // Normalize: strip protocol, path, query, hash, port, www
+    let domain = raw
+      .replace(/^https?:\/\//, '')
+      .replace(/[/?#].*$/, '')      // strip path, query, hash
+      .replace(/:\d+$/, '')          // strip port
+      .replace(/^www\./, '');
     if (!domain) return;
+
+    // Validate: must look like a hostname or IP
+    const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(domain);
+    const isLocalhost = domain === 'localhost';
+    const isDomain = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain);
+    if (!isIP && !isLocalhost && !isDomain) {
+      showError('Enter a valid domain (e.g. example.com) or IP address.');
+      return;
+    }
 
     // Avoid duplicates
     const existing = getWhitelistFromDOM();
     if (existing.includes(domain)) {
       input.value = '';
+      showError(`${domain} is already whitelisted.`);
       return;
     }
 

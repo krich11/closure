@@ -287,13 +287,33 @@
   }
 
   .whitelist-item {
-    @apply flex items-center justify-between py-2 px-3 rounded mb-1;
+    @apply flex items-center justify-between py-2 px-3 rounded mb-1 cursor-grab select-none;
     background: var(--color-card);
     border: 1px solid var(--color-border);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .whitelist-item.dragging {
+    @apply opacity-40;
+  }
+
+  .whitelist-item.drag-over-above {
+    border-top: 2px solid var(--color-warm);
+    padding-top: calc(0.5rem - 1px);
+  }
+
+  .whitelist-item.drag-over-below {
+    border-bottom: 2px solid var(--color-warm);
+    padding-bottom: calc(0.5rem - 1px);
+  }
+
+  .whitelist-grip {
+    @apply text-ink-muted text-sm mr-2 cursor-grab;
+    user-select: none;
   }
 
   .whitelist-domain {
-    @apply text-sm text-ink;
+    @apply text-sm text-ink flex-1;
     font-family: var(--font-sans);
   }
 
@@ -304,6 +324,11 @@
 
   .whitelist-remove:hover {
     @apply text-red;
+  }
+
+  .whitelist-error {
+    @apply text-xs mt-1;
+    color: var(--color-red);
   }
 
   .whitelist-empty {
