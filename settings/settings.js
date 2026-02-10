@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.3.0
+ * @version 1.3.1
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindToggle('topic-grouping-overnight', cfg.topicGroupingOvernightOnly ?? false);
   bindSelect('topic-grouping-interval', cfg.topicGroupingIntervalMinutes ?? 120);
   updateTopicGroupingVisibility(cfg.enableTopicGrouping ?? false);
+  updateOvernightInteractivity();
 
   applyHighContrast(cfg.highContrastMode ?? false);
   checkAiAvailability();
@@ -84,6 +85,20 @@ function updateTopicGroupingVisibility(enabled) {
   }
 }
 
+/**
+ * When "overnight only" is on, disable the interval select — the alarm
+ * fires once at 2 AM regardless of the chosen frequency.
+ */
+function updateOvernightInteractivity() {
+  const overnightBtn = document.getElementById('topic-grouping-overnight');
+  const intervalSelect = document.getElementById('topic-grouping-interval');
+  if (!overnightBtn || !intervalSelect) return;
+
+  const isOvernight = overnightBtn.getAttribute('aria-checked') === 'true';
+  intervalSelect.disabled = isOvernight;
+  intervalSelect.classList.toggle('field-select--disabled', isOvernight);
+}
+
 // ─── Toggle Switch Binding ────────────────────────────────────────
 
 function bindToggle(buttonId, initialValue) {
@@ -102,6 +117,10 @@ function bindToggle(buttonId, initialValue) {
 
     if (buttonId === 'enable-topic-grouping') {
       updateTopicGroupingVisibility(!current);
+    }
+
+    if (buttonId === 'topic-grouping-overnight') {
+      updateOvernightInteractivity();
     }
 
     saveConfig();

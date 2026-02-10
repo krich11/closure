@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Sunday Digest (digest.js)
- * @version 1.3.0
+ * @version 1.3.1
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -152,7 +152,7 @@ function formatSummary(text) {
   return `<p>${text}</p>`;
 }
 
-function setupEventListeners() {
+async function setupEventListeners() {
   // Delegate event listeners for restore buttons
   document.getElementById('archive-feed').addEventListener('click', async (e) => {
     if (e.target.classList.contains('restore-btn')) {

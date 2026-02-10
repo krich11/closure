@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.3.0
+ * @version 1.3.1
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -200,19 +200,15 @@ async function findExistingGroup(domain) {
  *
  * Skips silently when:
  *  - Feature is disabled in config
- *  - “Overnight only” is on and current time is outside 00:00–06:00
  *  - Fewer than 4 ungrouped tabs exist
  *  - AI is unavailable
+ *
+ * When “overnight only” is enabled, the alarm itself is scheduled at
+ * 2 AM daily, so no runtime hour check is needed here.
  */
 async function runTopicGrouping() {
   const { config } = await chrome.storage.local.get('config');
   if (!config?.enableTopicGrouping) return;
-
-  // Overnight-only gate: only run between midnight and 6 AM
-  if (config.topicGroupingOvernightOnly) {
-    const hour = new Date().getHours();
-    if (hour >= 6) return;
-  }
 
   // Gather ungrouped, non-pinned, non-audible, non-whitelisted http(s) tabs
   const allTabs = await chrome.tabs.query({ pinned: false });
@@ -346,14 +342,31 @@ async function contentScriptTopicCluster(prompt) {
  */
 async function scheduleTopicGroupingAlarm() {
   const { config } = await chrome.storage.local.get('config');
-  if (config?.enableTopicGrouping) {
+  if (!config?.enableTopicGrouping) {
+    chrome.alarms.clear(TOPIC_GROUPING_ALARM);
+    return;
+  }
+
+  if (config.topicGroupingOvernightOnly) {
+    // Schedule a single daily alarm at 2 AM local time
+    const now = new Date();
+    const next2am = new Date(now);
+    next2am.setHours(2, 0, 0, 0);
+    // If it's already past 2 AM today, schedule for tomorrow
+    if (now >= next2am) {
+      next2am.setDate(next2am.getDate() + 1);
+    }
+    const delayMs = next2am.getTime() - now.getTime();
+    chrome.alarms.create(TOPIC_GROUPING_ALARM, {
+      delayInMinutes: delayMs / 60000,
+      periodInMinutes: 1440, // repeat every 24 hours
+    });
+  } else {
     const interval = config.topicGroupingIntervalMinutes ?? DEFAULT_CONFIG.topicGroupingIntervalMinutes;
     chrome.alarms.create(TOPIC_GROUPING_ALARM, {
       delayInMinutes: 3,
       periodInMinutes: interval,
     });
-  } else {
-    chrome.alarms.clear(TOPIC_GROUPING_ALARM);
   }
 }
 

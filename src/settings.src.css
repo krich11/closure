@@ -133,6 +133,13 @@
     outline-offset: 2px;
   }
 
+  .field-select--disabled,
+  .field-select:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
   /* ── Topic Grouping Options ───────────────────────────────────── */
   .topic-grouping-options {
     @apply mt-3 pl-3;
