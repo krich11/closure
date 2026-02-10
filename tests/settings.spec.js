@@ -224,6 +224,71 @@ test.describe('Settings Page — Toggles', () => {
     expect(config.enableThematicClustering).toBe(true);
   });
 
+  test('topic grouping toggle saves to storage and shows options', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Options should be hidden by default
+    const options = page.locator('#topic-grouping-options');
+    await expect(options).toBeHidden();
+
+    // Toggle topic grouping on
+    const toggle = page.locator('#enable-topic-grouping');
+    await toggle.click();
+    await page.waitForTimeout(500);
+
+    // Options should now be visible
+    await expect(options).toBeVisible();
+
+    // Verify saved to storage
+    const config = await page.evaluate(async () => {
+      const data = await chrome.storage.local.get('config');
+      return data.config;
+    });
+    expect(config.enableTopicGrouping).toBe(true);
+  });
+
+  test('topic grouping interval select saves to storage', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Enable topic grouping first so options are visible
+    await page.locator('#enable-topic-grouping').click();
+    await page.waitForTimeout(300);
+
+    // Change interval
+    await page.locator('#topic-grouping-interval').selectOption('480');
+    await page.waitForTimeout(500);
+
+    const config = await page.evaluate(async () => {
+      const data = await chrome.storage.local.get('config');
+      return data.config;
+    });
+    expect(config.topicGroupingIntervalMinutes).toBe(480);
+  });
+
+  test('overnight toggle saves to storage', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Enable topic grouping first
+    await page.locator('#enable-topic-grouping').click();
+    await page.waitForTimeout(300);
+
+    // Toggle overnight on
+    await page.locator('#topic-grouping-overnight').click();
+    await page.waitForTimeout(500);
+
+    const config = await page.evaluate(async () => {
+      const data = await chrome.storage.local.get('config');
+      return data.config;
+    });
+    expect(config.topicGroupingOvernightOnly).toBe(true);
+  });
+
   test('high-contrast toggle saves and applies class', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);

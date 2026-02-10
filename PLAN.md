@@ -1,4 +1,4 @@
-# Closure Plan — v1.2.3
+# Closure Plan — v1.3.0
 
 ## Goal
 
@@ -118,6 +118,9 @@ No `host_permissions` — content scripts are injected programmatically via `chr
     "idleThresholdHours": 24,     // 4–168, default 24
     "whitelist": [],               // array of domain strings
     "enableThematicClustering": false,
+    "enableTopicGrouping": false,
+    "topicGroupingIntervalMinutes": 120,
+    "topicGroupingOvernightOnly": false,
     "highContrastMode": false
   },
   "archived": [

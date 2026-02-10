@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.2.3
+ * @version 1.3.0
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -16,6 +16,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   bindToggle('enable-clustering', cfg.enableThematicClustering ?? false);
   bindToggle('high-contrast', cfg.highContrastMode ?? false);
+
+  // Topic grouping controls
+  bindToggle('enable-topic-grouping', cfg.enableTopicGrouping ?? false);
+  bindToggle('topic-grouping-overnight', cfg.topicGroupingOvernightOnly ?? false);
+  bindSelect('topic-grouping-interval', cfg.topicGroupingIntervalMinutes ?? 120);
+  updateTopicGroupingVisibility(cfg.enableTopicGrouping ?? false);
 
   applyHighContrast(cfg.highContrastMode ?? false);
   checkAiAvailability();
@@ -50,6 +56,34 @@ function formatInt(v) {
   return String(v);
 }
 
+// ─── Select Binding ───────────────────────────────────────────────
+
+/**
+ * Bind a <select> element, set its initial value, and auto-save on change.
+ */
+function bindSelect(selectId, initialValue) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  select.value = String(initialValue);
+
+  select.addEventListener('change', () => {
+    saveConfig();
+  });
+}
+
+// ─── Topic Grouping Visibility ────────────────────────────────────
+
+/**
+ * Show/hide the topic grouping sub-options based on the toggle state.
+ */
+function updateTopicGroupingVisibility(enabled) {
+  const options = document.getElementById('topic-grouping-options');
+  if (options) {
+    options.hidden = !enabled;
+  }
+}
+
 // ─── Toggle Switch Binding ────────────────────────────────────────
 
 function bindToggle(buttonId, initialValue) {
@@ -66,6 +100,10 @@ function bindToggle(buttonId, initialValue) {
       applyHighContrast(!current);
     }
 
+    if (buttonId === 'enable-topic-grouping') {
+      updateTopicGroupingVisibility(!current);
+    }
+
     saveConfig();
   });
 }
@@ -77,11 +115,22 @@ async function saveConfig() {
     groupThreshold: parseInt(document.getElementById('group-threshold')?.value, 10) || 3,
     idleThresholdHours: parseInt(document.getElementById('idle-threshold')?.value, 10) || 24,
     enableThematicClustering: document.getElementById('enable-clustering')?.getAttribute('aria-checked') === 'true',
+    enableTopicGrouping: document.getElementById('enable-topic-grouping')?.getAttribute('aria-checked') === 'true',
+    topicGroupingIntervalMinutes: parseInt(document.getElementById('topic-grouping-interval')?.value, 10) || 120,
+    topicGroupingOvernightOnly: document.getElementById('topic-grouping-overnight')?.getAttribute('aria-checked') === 'true',
     highContrastMode: document.getElementById('high-contrast')?.getAttribute('aria-checked') === 'true',
     whitelist: getWhitelistFromDOM(),
   };
 
   await chrome.storage.local.set({ config: newConfig });
+
+  // Tell the service worker to reschedule the topic grouping alarm
+  try {
+    await chrome.runtime.sendMessage({ action: 'rescheduleTopicGrouping' });
+  } catch {
+    // Service worker may not be running yet
+  }
+
   showSaveStatus('Settings saved');
 }
 

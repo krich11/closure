@@ -8,6 +8,8 @@ Nothing leaves your device. Ever.
 
 - **Clean Slate Automator** — when you open 3+ tabs from the same domain (e.g. github.com), they're automatically grouped and collapsed into a single color-coded label. Click the label to expand and see the tabs inside. Nothing is closed, just organized.
 
+- **AI Topic Grouping** — periodically scans your ungrouped tabs and groups them by content using on-device AI. A Stack Overflow answer, a blog post, and a GitHub issue about "React hooks" would be grouped together, even though they're from different sites. Runs on a configurable schedule (10 min to 24 hours), with an "overnight only" option. Also available as a one-click "Cluster by Topic" button in the popup.
+
 - **Dead End Sweeper** — every 60 minutes, scans for tabs that are broken or stuck: HTTP errors (404, 500, 502, 503), DNS failures, timeouts, and pages that never finished loading. Logs them for reference, closes them, and briefly shows a badge count of how many were swept.
 
 - **Graceful Exit** — tabs you haven't touched for a configurable period (default 24 hours) are archived: the page content is summarized into 3 bullet points by Chrome's on-device Gemini Nano AI, then the tab is closed. Before archival, a "Stay of Execution" overlay gives you 10 minutes to keep the tab open or snooze it. If AI isn't available, the page title, URL, and first 500 characters are saved instead.

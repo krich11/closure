@@ -74,6 +74,9 @@ Always use this versioned schema in `chrome.storage.local`:
     "idleThresholdHours": 24,     // 4–168, default 24
     "whitelist": [],               // array of domain strings
     "enableThematicClustering": false,
+    "enableTopicGrouping": false,
+    "topicGroupingIntervalMinutes": 120,
+    "topicGroupingOvernightOnly": false,
     "highContrastMode": false
   },
   "archived": [

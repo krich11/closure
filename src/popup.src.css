@@ -54,6 +54,23 @@
     @apply opacity-60 cursor-not-allowed;
   }
 
+  /* Cluster Button */
+  .btn-cluster {
+    @apply w-full py-2 px-4 border rounded font-sans text-sm font-medium cursor-pointer mt-2;
+    background: transparent;
+    color: var(--color-warm);
+    border-color: var(--color-warm);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .btn-cluster:hover {
+    @apply bg-warm text-white;
+  }
+
+  .btn-cluster:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
   /* Stats */
   .stats-section p {
     @apply my-0.5 text-xs text-ink-muted;

@@ -27,6 +27,9 @@ test.describe('Extension Initialization', () => {
     expect(storageData.config.groupThreshold).toBe(3);
     expect(storageData.config.idleThresholdHours).toBe(24);
     expect(storageData.config.whitelist).toEqual([]);
+    expect(storageData.config.enableTopicGrouping).toBe(false);
+    expect(storageData.config.topicGroupingIntervalMinutes).toBe(120);
+    expect(storageData.config.topicGroupingOvernightOnly).toBe(false);
     expect(storageData.archived).toEqual([]);
     expect(storageData.swept).toEqual([]);
     expect(storageData.stats).toBeDefined();

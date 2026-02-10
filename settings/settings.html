@@ -62,6 +62,46 @@
           </button>
         </div>
 
+        <div class="field field-toggle">
+          <label for="enable-topic-grouping" class="field-label">
+            AI topic grouping
+            <span class="field-hint">Periodically scan your ungrouped tabs and group them by topic using AI — e.g. a Stack Overflow answer, a blog post, and a GitHub issue about "React hooks" would be grouped together, even though they're from different sites</span>
+          </label>
+          <button id="enable-topic-grouping" class="toggle" role="switch" aria-checked="false" type="button">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </button>
+        </div>
+
+        <div id="topic-grouping-options" class="topic-grouping-options" hidden>
+          <div class="field">
+            <label for="topic-grouping-interval" class="field-label">
+              Scan frequency
+              <span class="field-hint">How often Closure scans your open tabs for topic clusters</span>
+            </label>
+            <select id="topic-grouping-interval" class="field-select">
+              <option value="10">Every 10 minutes</option>
+              <option value="15">Every 15 minutes</option>
+              <option value="30">Every 30 minutes</option>
+              <option value="60">Every hour</option>
+              <option value="120" selected>Every 2 hours</option>
+              <option value="240">Every 4 hours</option>
+              <option value="480">Every 8 hours</option>
+              <option value="720">Every 12 hours</option>
+              <option value="1440">Every 24 hours</option>
+            </select>
+          </div>
+
+          <div class="field field-toggle">
+            <label for="topic-grouping-overnight" class="field-label">
+              Overnight only
+              <span class="field-hint">Only run topic grouping between midnight and 6 AM — saves resources during the day</span>
+            </label>
+            <button id="topic-grouping-overnight" class="toggle" role="switch" aria-checked="false" type="button">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </button>
+          </div>
+        </div>
+
         <div id="ai-status" class="ai-status" role="status" aria-live="polite"></div>
         <button id="ai-download-btn" class="btn btn-sm" hidden>Download AI Model</button>
 
@@ -134,7 +174,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.2.3 — 100% local, 100% private.</p>
+      <p>Closure v1.3.0 — 100% local, 100% private.</p>
     </footer>
   </div>
 

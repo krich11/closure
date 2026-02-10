@@ -118,6 +118,27 @@
     transform: translateX(1.25rem);
   }
 
+  /* ── Select Dropdown ──────────────────────────────────────────── */
+  .field-select {
+    @apply w-full py-2 px-3 rounded text-sm font-sans;
+    background: var(--color-card);
+    color: var(--color-ink);
+    border: 1px solid var(--color-border);
+    transition: border-color 0.2s ease;
+    appearance: auto;
+  }
+
+  .field-select:focus {
+    outline: 2px solid var(--color-warm);
+    outline-offset: 2px;
+  }
+
+  /* ── Topic Grouping Options ───────────────────────────────────── */
+  .topic-grouping-options {
+    @apply mt-3 pl-3;
+    border-left: 2px solid var(--color-border);
+  }
+
   /* ── AI Status ────────────────────────────────────────────────── */
   .ai-status {
     @apply text-xs py-2 px-3 rounded mt-3;

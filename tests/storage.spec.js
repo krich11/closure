@@ -105,5 +105,10 @@ test.describe('Storage Schema', () => {
     // idleThresholdHours: 4–168, default 24
     expect(config.idleThresholdHours).toBeGreaterThanOrEqual(4);
     expect(config.idleThresholdHours).toBeLessThanOrEqual(168);
+
+    // topic grouping defaults
+    expect(typeof config.enableTopicGrouping).toBe('boolean');
+    expect(typeof config.topicGroupingIntervalMinutes).toBe('number');
+    expect(typeof config.topicGroupingOvernightOnly).toBe('boolean');
   });
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Popup script (popup.js)
- * @version 1.2.3
+ * @version 1.3.0
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -85,6 +85,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       setTimeout(() => {
         archiveBtn.disabled = false;
         archiveBtn.textContent = 'Archive Idle Tabs Now';
+      }, 3000);
+    });
+  }
+
+  // Cluster by Topic button — only shown when AI topic grouping is enabled
+  const clusterBtn = document.getElementById('cluster-now');
+  if (clusterBtn) {
+    const cfg = data.config || {};
+    if (cfg.enableTopicGrouping) {
+      clusterBtn.hidden = false;
+    }
+
+    clusterBtn.addEventListener('click', async () => {
+      clusterBtn.disabled = true;
+      clusterBtn.textContent = 'Clustering...';
+
+      try {
+        await chrome.runtime.sendMessage({ action: 'runTopicGrouping' });
+        clusterBtn.textContent = 'Done!';
+      } catch (err) {
+        clusterBtn.textContent = 'Error — try again';
+        console.error('[Closure] Topic grouping error:', err);
+      }
+
+      setTimeout(() => {
+        clusterBtn.disabled = false;
+        clusterBtn.textContent = 'Cluster by Topic';
       }, 3000);
     });
   }

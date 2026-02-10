@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.2.3
+ * @version 1.3.0
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -14,6 +14,9 @@ const DEFAULT_CONFIG = {
   idleThresholdHours: 24,
   whitelist: [],
   enableThematicClustering: false,
+  enableTopicGrouping: false,
+  topicGroupingIntervalMinutes: 120,
+  topicGroupingOvernightOnly: false,
   highContrastMode: false,
 };
 
@@ -47,6 +50,10 @@ const SNOOZE_ALARM_PREFIX = 'snooze-';
 const STAY_OF_EXECUTION_MINUTES = 10;
 const RAM_PER_TAB_MB = 50;
 const NUCLEAR_IDLE_HOURS = 4;
+
+// ─── Topic Grouping constants ───────────────────────────────────
+const TOPIC_GROUPING_ALARM = 'topic-grouping';
+const TOPIC_GROUPING_MIN_TABS = 4;
 
 // Race condition guard: tabs currently being archived
 const archivingTabs = new Set();
@@ -180,6 +187,174 @@ async function evaluateAutoGroup(triggerTab) {
 async function findExistingGroup(domain) {
   const groups = await chrome.tabGroups.query({ title: domain.toUpperCase() });
   return groups.length > 0 ? groups[0] : null;
+}
+
+// ─── Topic Grouping (AI-powered content clustering) ────────────
+
+/**
+ * Run AI-powered topic grouping on ungrouped tabs.
+ *
+ * Only processes tabs that aren’t already in a group (groupId === -1),
+ * so domain grouping always takes priority. Extracts page content,
+ * sends it to on-device AI, and creates collapsed topic groups.
+ *
+ * Skips silently when:
+ *  - Feature is disabled in config
+ *  - “Overnight only” is on and current time is outside 00:00–06:00
+ *  - Fewer than 4 ungrouped tabs exist
+ *  - AI is unavailable
+ */
+async function runTopicGrouping() {
+  const { config } = await chrome.storage.local.get('config');
+  if (!config?.enableTopicGrouping) return;
+
+  // Overnight-only gate: only run between midnight and 6 AM
+  if (config.topicGroupingOvernightOnly) {
+    const hour = new Date().getHours();
+    if (hour >= 6) return;
+  }
+
+  // Gather ungrouped, non-pinned, non-audible, non-whitelisted http(s) tabs
+  const allTabs = await chrome.tabs.query({ pinned: false });
+  const candidates = [];
+  for (const tab of allTabs) {
+    if (tab.groupId !== -1) continue;   // already grouped
+    if (tab.audible) continue;           // audible immunity
+    const domain = getRootDomain(tab.url);
+    if (!domain) continue;               // non-http
+    if (await isDomainWhitelisted(domain)) continue;
+    candidates.push(tab);
+  }
+
+  if (candidates.length < TOPIC_GROUPING_MIN_TABS) return;
+
+  // Extract content from each candidate tab
+  const tabContents = [];
+  for (const tab of candidates) {
+    const content = await extractPageContent(tab);
+    tabContents.push({
+      tab,
+      title: content.title || tab.title || '',
+      text: content.text || '',
+    });
+  }
+
+  // Build the AI prompt
+  const summaries = tabContents
+    .map((tc, i) => `[${i}] ${tc.title}\n${tc.text.substring(0, 200)}`)
+    .join('\n\n');
+
+  const prompt = `You are a tab organizer. Group these browser tabs by topic. Only create a cluster if 2 or more tabs share a clear theme. Leave unrelated tabs unclustered. Return ONLY valid JSON, no markdown:\n{"clusters":[{"title":"Short Topic Name","indices":[0,1]}]}\n\n${summaries}`;
+
+  // Run AI via content script injection (LanguageModel lives in page context)
+  let clusters;
+  try {
+    // Pick the first candidate tab to run AI in its context
+    const hostTab = candidates[0];
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: hostTab.id },
+      func: contentScriptTopicCluster,
+      args: [prompt],
+    });
+
+    if (!results?.[0]?.result) return;
+    clusters = results[0].result;
+  } catch {
+    return; // AI unavailable or injection failed
+  }
+
+  if (!clusters?.clusters || !Array.isArray(clusters.clusters)) return;
+
+  // Create tab groups from AI clusters
+  for (const cluster of clusters.clusters) {
+    if (!cluster.title || !Array.isArray(cluster.indices)) continue;
+    if (cluster.indices.length < 2) continue;
+
+    // Map indices to tab IDs, skipping invalid indices
+    const tabIds = cluster.indices
+      .filter((i) => i >= 0 && i < tabContents.length)
+      .map((i) => tabContents[i].tab.id);
+
+    if (tabIds.length < 2) continue;
+
+    // Verify tabs still exist and are ungrouped
+    const validIds = [];
+    for (const id of tabIds) {
+      try {
+        const t = await chrome.tabs.get(id);
+        if (t.groupId === -1) validIds.push(id);
+      } catch {
+        // Tab was closed between extraction and grouping
+      }
+    }
+
+    if (validIds.length < 2) continue;
+
+    try {
+      const groupId = await chrome.tabs.group({ tabIds: validIds });
+      const colorIndex = domainToColorIndex(cluster.title.toLowerCase());
+      await chrome.tabGroups.update(groupId, {
+        title: cluster.title.toUpperCase(),
+        color: GROUP_COLORS[colorIndex],
+        collapsed: true,
+      });
+    } catch (err) {
+      console.error('[Closure] Topic group creation error:', err);
+    }
+  }
+}
+
+/**
+ * Self-contained function injected into a page to run AI topic clustering.
+ * Checks for LanguageModel global (Chrome 138+) or legacy window.ai.
+ * Must have no references to outer scope.
+ *
+ * @param {string} prompt
+ * @returns {Promise<{ clusters: Array<{ title: string, indices: number[] }> }|null>}
+ */
+async function contentScriptTopicCluster(prompt) {
+  try {
+    let session;
+
+    if (typeof LanguageModel !== 'undefined') {
+      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+      if (availability === 'unavailable') return null;
+      session = await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
+    } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
+      const capabilities = await window.ai.languageModel.capabilities?.();
+      if (capabilities?.available === 'no') return null;
+      session = await window.ai.languageModel.create();
+    } else {
+      return null;
+    }
+
+    const response = await session.prompt(prompt);
+    session.destroy();
+
+    // Parse JSON from response (AI may wrap in markdown code fences)
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Schedule or update the topic grouping alarm based on config.
+ * Called on install, config change, or feature toggle.
+ */
+async function scheduleTopicGroupingAlarm() {
+  const { config } = await chrome.storage.local.get('config');
+  if (config?.enableTopicGrouping) {
+    const interval = config.topicGroupingIntervalMinutes ?? DEFAULT_CONFIG.topicGroupingIntervalMinutes;
+    chrome.alarms.create(TOPIC_GROUPING_ALARM, {
+      delayInMinutes: 3,
+      periodInMinutes: interval,
+    });
+  } else {
+    chrome.alarms.clear(TOPIC_GROUPING_ALARM);
+  }
 }
 
 
@@ -856,6 +1031,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     delayInMinutes: 2,
     periodInMinutes: IDLE_CHECK_INTERVAL_MINUTES,
   });
+
+  // Schedule topic grouping if enabled
+  await scheduleTopicGroupingAlarm();
 });
 
 // Tab created — evaluate grouping for the new tab's domain
@@ -892,6 +1070,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     return;
   }
 
+  if (alarm.name === TOPIC_GROUPING_ALARM) {
+    await runTopicGrouping();
+    return;
+  }
+
   // Snooze alarm expired — tab is eligible for archival again
   if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
     // No action needed; the snooze alarm simply expires
@@ -924,6 +1107,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ count });
     });
     return true; // async sendResponse
+  }
+
+  if (message.action === 'runTopicGrouping') {
+    runTopicGrouping().then(() => {
+      sendResponse({ ok: true });
+    }).catch((err) => {
+      console.error('[Closure] Manual topic grouping error:', err);
+      sendResponse({ ok: false });
+    });
+    return true;
+  }
+
+  if (message.action === 'rescheduleTopicGrouping') {
+    scheduleTopicGroupingAlarm().then(() => {
+      sendResponse({ ok: true });
+    });
+    return true;
   }
 
   return false;
