@@ -10,13 +10,13 @@
   <main id="popup-main">
     <h1>Closure</h1>
     <div id="status-ring" role="status" aria-live="polite" aria-label="Browser health indicator"></div>
-    <p id="tab-count"></p>
-    <button id="archive-now" type="button">Archive Idle Tabs Now</button>
+    <p id="tab-count" aria-live="polite"></p>
+    <button id="archive-now" type="button" aria-label="Archive all idle tabs now">Archive Idle Tabs Now</button>
     <div id="stats" aria-live="polite">
       <p id="tabs-tidied"></p>
       <p id="ram-saved"></p>
     </div>
-    <a id="open-digest" href="#">Sunday Digest</a>
+    <a id="open-digest" href="#" role="link" aria-label="Open Sunday Digest">Sunday Digest</a>
   </main>
   <script src="popup.js"></script>
 </body>

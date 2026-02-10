@@ -41,6 +41,17 @@ const SWEEP_INTERVAL_MINUTES = 60;
 const BADGE_CLEAR_ALARM = 'clear-sweep-badge';
 const STUCK_TAB_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
+// ─── Graceful Exit constants ────────────────────────────────────
+const IDLE_CHECK_ALARM = 'idle-tab-check';
+const IDLE_CHECK_INTERVAL_MINUTES = 15;
+const SNOOZE_ALARM_PREFIX = 'snooze-';
+const STAY_OF_EXECUTION_MINUTES = 10;
+const RAM_PER_TAB_MB = 50;
+const NUCLEAR_IDLE_HOURS = 4;
+
+// Race condition guard: tabs currently being archived
+const archivingTabs = new Set();
+
 /**
  * Error patterns matched against tab title for quick detection
  * without needing to inject a content script (handles chrome://
@@ -432,6 +443,410 @@ function updateSweepBadge(count) {
   chrome.alarms.create(BADGE_CLEAR_ALARM, { delayInMinutes: 0.5 });
 }
 
+// ─── Graceful Exit (Archival) ───────────────────────────────────
+
+/**
+ * Scan all tabs and identify those idle beyond the configured threshold.
+ * Processes them sequentially to avoid storage write races.
+ */
+async function runIdleTabCheck() {
+  const { config } = await chrome.storage.local.get('config');
+  const thresholdHours = config?.idleThresholdHours ?? DEFAULT_CONFIG.idleThresholdHours;
+  const thresholdMs = thresholdHours * 60 * 60 * 1000;
+
+  const allTabs = await chrome.tabs.query({});
+  const now = Date.now();
+
+  for (const tab of allTabs) {
+    // Safety net: never archive pinned or audible tabs
+    if (tab.pinned) continue;
+    if (tab.audible) continue;
+
+    // Skip tabs already being processed
+    if (archivingTabs.has(tab.id)) continue;
+
+    // Skip non-http tabs
+    const domain = getRootDomain(tab.url);
+    if (!domain) continue;
+
+    // Skip whitelisted domains
+    if (await isDomainWhitelisted(domain)) continue;
+
+    // Skip snoozed tabs
+    if (await isTabSnoozed(tab.id)) continue;
+
+    // Check idle duration
+    const lastAccessed = tab.lastAccessed || now;
+    const idleMs = now - lastAccessed;
+    if (idleMs < thresholdMs) continue;
+
+    // Archive this tab
+    archivingTabs.add(tab.id);
+    try {
+      await archiveTab(tab);
+    } catch (err) {
+      console.error('[Closure] Archive error for tab', tab.id, err);
+    } finally {
+      archivingTabs.delete(tab.id);
+    }
+  }
+}
+
+/**
+ * Check whether a tab has an active snooze alarm.
+ * Snooze alarms are named "snooze-{tabId}".
+ *
+ * @param {number} tabId
+ * @returns {Promise<boolean>}
+ */
+async function isTabSnoozed(tabId) {
+  const alarm = await chrome.alarms.get(`${SNOOZE_ALARM_PREFIX}${tabId}`);
+  return !!alarm;
+}
+
+/**
+ * Extract page content from a tab by injecting a content script.
+ * Falls back to tab metadata if injection fails.
+ *
+ * @param {chrome.tabs.Tab} tab
+ * @returns {Promise<{ title: string, metaDescription: string, text: string, faviconUrl: string }>}
+ */
+async function extractPageContent(tab) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: contentScriptExtractContent,
+    });
+
+    if (results && results[0] && results[0].result) {
+      return results[0].result;
+    }
+  } catch {
+    // Injection failed — use metadata fallback
+  }
+
+  // Fallback: use what we have from the tab object
+  return {
+    title: tab.title || '',
+    metaDescription: '',
+    text: '',
+    faviconUrl: tab.favIconUrl || '',
+  };
+}
+
+/**
+ * Self-contained function injected into pages to extract content.
+ * Must have no references to outer scope.
+ */
+function contentScriptExtractContent() {
+  const title = document.title || '';
+
+  const metaEl = document.querySelector('meta[name="description"]');
+  const metaDescription = metaEl ? metaEl.getAttribute('content') || '' : '';
+
+  const text = (document.body?.innerText || '').substring(0, 500);
+
+  const iconLink = document.querySelector('link[rel~="icon"]');
+  const faviconUrl = iconLink
+    ? iconLink.href
+    : `${location.origin}/favicon.ico`;
+
+  return { title, metaDescription, text, faviconUrl };
+}
+
+/**
+ * Attempt AI summarization of page content via window.ai.
+ * If unavailable, returns a fallback summary from the raw text.
+ *
+ * This runs via content script injection since window.ai lives
+ * in the page context, not the service worker.
+ *
+ * @param {chrome.tabs.Tab} tab
+ * @param {{ title: string, metaDescription: string, text: string }} content
+ * @returns {Promise<{ summary: string, summaryType: 'ai'|'fallback' }>}
+ */
+async function summarizeContent(tab, content) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: contentScriptSummarize,
+      args: [content.title, content.metaDescription, content.text],
+    });
+
+    if (results && results[0] && results[0].result) {
+      return results[0].result;
+    }
+  } catch {
+    // AI unavailable or injection failed
+  }
+
+  // Fallback: use raw content as summary
+  const fallback = buildFallbackSummary(content);
+  return { summary: fallback, summaryType: 'fallback' };
+}
+
+/**
+ * Self-contained function injected into pages to run AI summarization.
+ * Checks for window.ai availability and uses the specified prompt.
+ * Must have no references to outer scope.
+ *
+ * @param {string} title
+ * @param {string} metaDescription
+ * @param {string} text
+ * @returns {Promise<{ summary: string, summaryType: 'ai'|'fallback' }>}
+ */
+async function contentScriptSummarize(title, metaDescription, text) {
+  // Check window.ai availability
+  if (typeof window.ai === 'undefined' || !window.ai) {
+    return null; // Signal caller to use fallback
+  }
+
+  try {
+    // Check for sufficient resources
+    const capabilities = await window.ai.languageModel?.capabilities?.();
+    if (capabilities?.available === 'no') {
+      return null;
+    }
+
+    const session = await window.ai.languageModel.create();
+    const pageContent = `Title: ${title}\nDescription: ${metaDescription}\nContent: ${text}`;
+    const prompt = `Summarize this page in 3 bullet points (total under 100 words), preserving key facts, numbers, dates, action items, and the user's likely intent for visiting.\n\n${pageContent}`;
+
+    const summary = await session.prompt(prompt);
+    session.destroy();
+
+    return { summary, summaryType: 'ai' };
+  } catch {
+    // AI error (insufficient resources, etc.) — fall back silently
+    return null;
+  }
+}
+
+/**
+ * Build a fallback summary from raw extracted content.
+ *
+ * @param {{ title: string, metaDescription: string, text: string }} content
+ * @returns {string}
+ */
+function buildFallbackSummary(content) {
+  const parts = [];
+  if (content.title) parts.push(content.title);
+  if (content.metaDescription) parts.push(content.metaDescription);
+  if (content.text) parts.push(content.text.substring(0, 300));
+  return parts.join(' — ') || 'No content available';
+}
+
+/**
+ * Archive a single tab: extract content, summarize, persist to storage,
+ * then close the tab and send a notification.
+ *
+ * Critical ordering: save to storage BEFORE closing the tab to survive
+ * service worker termination.
+ *
+ * @param {chrome.tabs.Tab} tab
+ */
+async function archiveTab(tab) {
+  // Verify the tab still exists
+  try {
+    await chrome.tabs.get(tab.id);
+  } catch {
+    return; // Tab was closed by user — nothing to do
+  }
+
+  const domain = getRootDomain(tab.url) || 'unknown';
+
+  // Extract page content
+  const content = await extractPageContent(tab);
+
+  // Attempt AI summarization
+  const { summary, summaryType } = await summarizeContent(tab, content);
+
+  // Persist to storage BEFORE closing (survives worker death)
+  const data = await chrome.storage.local.get(['archived', 'stats']);
+  const archived = data.archived || [];
+  const stats = data.stats || { tabsTidiedThisWeek: 0, ramSavedEstimate: 0 };
+
+  archived.push({
+    url: tab.url || '',
+    title: content.title || tab.title || 'Untitled',
+    favicon: content.faviconUrl || tab.favIconUrl || '',
+    timestamp: Date.now(),
+    summary,
+    summaryType,
+    domain,
+  });
+
+  stats.tabsTidiedThisWeek += 1;
+  stats.ramSavedEstimate += RAM_PER_TAB_MB;
+
+  await chrome.storage.local.set({ archived, stats });
+
+  // Now close the tab
+  try {
+    await chrome.tabs.remove(tab.id);
+  } catch {
+    // Tab may have been closed between save and remove — that's fine
+  }
+
+  // Send notification
+  sendArchivalNotification(content.title || tab.title || 'Untitled');
+}
+
+/**
+ * Send a notification when a tab is archived.
+ *
+ * @param {string} pageTitle
+ */
+function sendArchivalNotification(pageTitle) {
+  const truncated = pageTitle.length > 50
+    ? pageTitle.substring(0, 47) + '...'
+    : pageTitle;
+
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: 'icons/icon-128.png',
+    title: 'Tab Archived',
+    message: `Moved "${truncated}" to your Sunday Digest. Summary saved.`,
+    priority: 0,
+  });
+}
+
+/**
+ * Nuclear archive: close all tabs idle > 4 hours.
+ * Used by the popup's "Archive Idle Tabs Now" button.
+ * Returns the count of archived tabs for toast display.
+ *
+ * @returns {Promise<number>} count of archived tabs
+ */
+async function handleNuclearArchive() {
+  const thresholdMs = NUCLEAR_IDLE_HOURS * 60 * 60 * 1000;
+  const allTabs = await chrome.tabs.query({});
+  const now = Date.now();
+  let archivedCount = 0;
+
+  for (const tab of allTabs) {
+    if (tab.pinned) continue;
+    if (tab.audible) continue;
+    if (archivingTabs.has(tab.id)) continue;
+
+    const domain = getRootDomain(tab.url);
+    if (!domain) continue;
+    if (await isDomainWhitelisted(domain)) continue;
+    if (await isTabSnoozed(tab.id)) continue;
+
+    const lastAccessed = tab.lastAccessed || now;
+    if (now - lastAccessed < thresholdMs) continue;
+
+    archivingTabs.add(tab.id);
+    try {
+      await archiveTab(tab);
+      archivedCount++;
+    } catch (err) {
+      console.error('[Closure] Nuclear archive error:', err);
+    } finally {
+      archivingTabs.delete(tab.id);
+    }
+  }
+
+  // Post-nuclear badge
+  if (archivedCount > 0) {
+    updateSweepBadge(archivedCount);
+  }
+
+  return archivedCount;
+}
+
+/**
+ * Inject a "Stay of Execution" overlay into a tab.
+ * Shows a countdown with "Keep this open?" / "Yes" / "Snooze 24h".
+ * Self-contained injection — no external dependencies.
+ *
+ * @param {number} tabId
+ */
+async function injectStayOfExecution(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: contentScriptStayOfExecution,
+    });
+  } catch {
+    // Injection failed (restricted page) — proceed with archival
+  }
+}
+
+/**
+ * Self-contained function that injects the Stay of Execution overlay.
+ * Must have no references to outer scope.
+ */
+function contentScriptStayOfExecution() {
+  // Don't inject twice
+  if (document.getElementById('closure-stay-overlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'closure-stay-overlay';
+  overlay.setAttribute('role', 'alertdialog');
+  overlay.setAttribute('aria-label', 'Tab about to be archived');
+  overlay.innerHTML = `
+    <style>
+      #closure-stay-overlay {
+        position: fixed; top: 0; left: 0; right: 0;
+        z-index: 2147483647;
+        background: linear-gradient(135deg, #fdfbf7 0%, #f5f0e8 100%);
+        border-bottom: 2px solid #d4a373;
+        padding: 16px 24px;
+        display: flex; align-items: center; justify-content: space-between;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        animation: closure-slide-down 0.3s ease;
+      }
+      @keyframes closure-slide-down {
+        from { transform: translateY(-100%); }
+        to { transform: translateY(0); }
+      }
+      #closure-stay-overlay .closure-msg {
+        font-size: 14px; color: #2d2a26;
+      }
+      #closure-stay-overlay .closure-icon {
+        width: 20px; height: 20px; margin-right: 10px;
+        border-radius: 4px; vertical-align: middle;
+      }
+      #closure-stay-overlay button {
+        padding: 6px 16px; border-radius: 4px; cursor: pointer;
+        font-size: 13px; font-weight: 500; margin-left: 8px;
+        border: 1px solid #d4a373; transition: all 0.2s;
+      }
+      #closure-stay-overlay .closure-keep {
+        background: #d4a373; color: white; border-color: #d4a373;
+      }
+      #closure-stay-overlay .closure-keep:hover { background: #c59060; }
+      #closure-stay-overlay .closure-snooze {
+        background: white; color: #5e5b56;
+      }
+      #closure-stay-overlay .closure-snooze:hover { background: #f5f0e8; }
+    </style>
+    <span class="closure-msg">
+      <img class="closure-icon" src="${document.querySelector('link[rel~=icon]')?.href || ''}" alt="" onerror="this.style.display='none'">
+      This tab is about to be archived. Keep it open?
+    </span>
+    <span>
+      <button class="closure-keep" type="button">Yes, Keep</button>
+      <button class="closure-snooze" type="button">Snooze 24h</button>
+    </span>
+  `;
+
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('.closure-keep').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'stayOfExecution', decision: 'keep' });
+    overlay.remove();
+  });
+
+  overlay.querySelector('.closure-snooze').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'stayOfExecution', decision: 'snooze' });
+    overlay.remove();
+  });
+}
+
 // ─── Event Listeners (registered synchronously at top level) ────
 
 // Dead End Sweeper — in-progress guard to prevent concurrent sweeps
@@ -453,6 +868,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   chrome.alarms.create(SWEEP_ALARM_NAME, {
     delayInMinutes: 1,             // first sweep 1 min after install
     periodInMinutes: SWEEP_INTERVAL_MINUTES,
+  });
+
+  // Schedule recurring idle tab check
+  chrome.alarms.create(IDLE_CHECK_ALARM, {
+    delayInMinutes: 2,
+    periodInMinutes: IDLE_CHECK_INTERVAL_MINUTES,
   });
 });
 
@@ -490,11 +911,44 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     return;
   }
 
-  // Future: idle-tab check alarms
+  if (alarm.name === IDLE_CHECK_ALARM) {
+    await runIdleTabCheck();
+    return;
+  }
+
+  // Snooze alarm expired — tab is eligible for archival again
+  if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
+    // No action needed; the snooze alarm simply expires
+    // and isTabSnoozed() will return false on next check
+    return;
+  }
 });
 
-// Message handler for content script communication
+// Message handler for content script + popup communication
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Placeholder — feature handlers will be added here
+  if (message.action === 'stayOfExecution') {
+    const tabId = sender.tab?.id;
+    if (!tabId) return false;
+
+    if (message.decision === 'keep') {
+      // Remove from archiving set — tab stays open permanently
+      archivingTabs.delete(tabId);
+    } else if (message.decision === 'snooze') {
+      // Snooze for 24 hours via alarm (survives worker restart)
+      archivingTabs.delete(tabId);
+      chrome.alarms.create(`${SNOOZE_ALARM_PREFIX}${tabId}`, {
+        delayInMinutes: 24 * 60,
+      });
+    }
+    return false;
+  }
+
+  if (message.action === 'nuclearArchive') {
+    handleNuclearArchive().then((count) => {
+      sendResponse({ count });
+    });
+    return true; // async sendResponse
+  }
+
   return false;
 });

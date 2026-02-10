@@ -29,14 +29,14 @@ Phase 1 (The Mechanic) is partially complete:
 
 ### Phase 2: The Brain
 
-- [ ] Graceful Exit: idle tab detection comparing `tab.lastAccessed` vs threshold.
-- [ ] Content script extraction: title, meta description, first 500 chars, favicon URL.
-- [ ] AI summarization via `window.ai` with exact prompt. Fallback to metadata-only.
-- [ ] Stay of Execution overlay: inject 10 min before archival via content script.
-- [ ] Archival flow: save to `archived[]`, close tab, fire notification.
-- [ ] Nuclear archive button: handler in popup.js for all tabs idle > 4h.
-- [ ] Stats updates: increment `tabsTidiedThisWeek`, add ~50 MB per tab to `ramSavedEstimate`.
-- [ ] Post-nuclear toast if >20 tabs archived.
+- [x] Graceful Exit: idle tab detection comparing `tab.lastAccessed` vs threshold.
+- [x] Content script extraction: title, meta description, first 500 chars, favicon URL.
+- [x] AI summarization via `window.ai` with exact prompt. Fallback to metadata-only.
+- [x] Stay of Execution overlay: inject 10 min before archival via content script.
+- [x] Archival flow: save to `archived[]`, close tab, fire notification.
+- [x] Nuclear archive button: handler in popup.js for all tabs idle > 4h.
+- [x] Stats updates: increment `tabsTidiedThisWeek`, add ~50 MB per tab to `ramSavedEstimate`.
+- [x] Post-nuclear toast if >20 tabs archived.
 
 ### Phase 3: The Soul
 

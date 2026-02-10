@@ -1,1 +1,188 @@
-/* Closure — Popup styles (stub) */
+/* Closure — Popup styles (Zen aesthetic)
+ * @version 1.1.0
+ */
+
+:root {
+  --bg-paper: #fdfbf7;
+  --bg-card: #ffffff;
+  --text-primary: #2d2a26;
+  --text-secondary: #5e5b56;
+  --text-muted: #8c8984;
+  --accent-warm: #d4a373;
+  --border-subtle: #e6e2dd;
+  --font-serif: 'Georgia', 'Times New Roman', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-paper);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#popup-main {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+h1 {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* Status Ring */
+#status-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 4px solid var(--border-subtle);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#status-ring[data-health="green"] {
+  border-color: #6b9e6b;
+  box-shadow: 0 0 8px rgba(107, 158, 107, 0.3);
+}
+
+#status-ring[data-health="yellow"] {
+  border-color: #d4a373;
+  box-shadow: 0 0 8px rgba(212, 163, 115, 0.3);
+}
+
+#status-ring[data-health="red"] {
+  border-color: #c45c5c;
+  box-shadow: 0 0 8px rgba(196, 92, 92, 0.3);
+}
+
+#tab-count {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Archive Button */
+#archive-now {
+  width: 100%;
+  padding: 10px 16px;
+  background-color: var(--accent-warm);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+  font-family: var(--font-sans);
+}
+
+#archive-now:hover {
+  background-color: #c59060;
+}
+
+#archive-now:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#archive-now:focus-visible {
+  outline: 2px solid var(--accent-warm);
+  outline-offset: 2px;
+}
+
+/* Stats */
+#stats {
+  width: 100%;
+  text-align: center;
+}
+
+#stats p {
+  margin: 2px 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Digest Link */
+#open-digest {
+  font-size: 0.85rem;
+  color: var(--accent-warm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+#open-digest:hover {
+  color: var(--text-primary);
+}
+
+#open-digest:focus-visible {
+  outline: 2px solid var(--accent-warm);
+  outline-offset: 2px;
+}
+
+/* Nuclear Toast */
+#nuclear-toast {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-align: center;
+  animation: toast-fade-in 0.3s ease;
+}
+
+#nuclear-toast p {
+  margin: 0 0 4px 0;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+#nuclear-toast .toast-donate {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+#nuclear-toast .toast-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--accent-warm);
+  text-decoration: underline;
+}
+
+@keyframes toast-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-paper: #1a1918;
+    --bg-card: #242321;
+    --text-primary: #e6e2dd;
+    --text-secondary: #a8a49e;
+    --text-muted: #6b6863;
+    --border-subtle: #363430;
+    --accent-warm: #c59d75;
+  }
+}
