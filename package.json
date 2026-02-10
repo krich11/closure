@@ -1,0 +1,27 @@
+{
+  "name": "closure",
+  "version": "1.0.0",
+  "description": "Tab-Shame Absolution Engine — a privacy-first Chromium extension",
+  "main": "background.js",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "test:report": "npx playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/krich11/closure.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/krich11/closure/issues"
+  },
+  "homepage": "https://github.com/krich11/closure#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}
