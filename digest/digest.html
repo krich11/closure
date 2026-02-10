@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sunday Digest — Closure</title>
+  <title>Memory Lane — Closure</title>
   <link rel="stylesheet" href="digest.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
     <header class="masthead">
       <div class="masthead-brand">
         <img src="../icons/icon-48.png" alt="Closure Icon" class="masthead-logo">
-        <h1>Sunday Digest</h1>
+        <h1>Memory Lane</h1>
       </div>
       <p class="masthead-date" id="digest-date">February 9, 2026</p>
     </header>
@@ -53,16 +53,33 @@
         </div>
       </div>
 
+      <!-- Search Bar -->
+      <div class="search-bar">
+        <label for="search-input" class="sr-only">Search archived tabs</label>
+        <input type="search" id="search-input" class="search-input" placeholder="Search titles, URLs, summaries..." autocomplete="off" spellcheck="false">
+      </div>
+
       <!-- Archive Feed -->
       <div class="archive-feed" id="archive-feed" role="feed" aria-label="Archived tabs">
         <div class="empty-state">
-          <p>Your mind is clear. No tabs were archived this week.</p>
+          <p>Your mind is clear. No tabs were archived yet.</p>
         </div>
+      </div>
+
+      <!-- No Results (search) -->
+      <div id="no-results" class="empty-state" hidden>
+        <p>No archived tabs match your search.</p>
       </div>
     </main>
 
     <!-- Gratitude Footer -->
     <footer class="digest-footer">
+      <div class="export-bar">
+        <span class="export-label">Export archive:</span>
+        <button id="export-json" class="btn btn-secondary btn-sm" type="button">JSON</button>
+        <button id="export-csv" class="btn btn-secondary btn-sm" type="button">CSV</button>
+      </div>
+
       <div class="donation-prompt">
         <p class="donation-hearts" aria-hidden="true">&#9829; &#9829; &#9829;</p>
         <p class="donation-text">

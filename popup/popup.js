@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Popup script (popup.js)
- * @version 1.5.0
+ * @version 1.6.0
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       : `~${mbSaved} MB RAM saved`;
   }
 
-  // Sunday Digest link
+  // Memory Lane link
   const digestLink = document.getElementById('open-digest');
   if (digestLink) {
     digestLink.addEventListener('click', (e) => {

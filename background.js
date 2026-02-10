@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.5.0
+ * @version 1.6.0
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -19,6 +19,8 @@ const DEFAULT_CONFIG = {
   topicGroupingIntervalMinutes: 120,
   topicGroupingOvernightOnly: false,
   highContrastMode: false,
+  archiveRetentionDays: 0,       // 0 = keep forever, 7–365 otherwise
+  archiveSortBy: 'recency',      // 'recency' | 'domain'
 };
 
 const DEFAULT_STORAGE = {
@@ -55,6 +57,10 @@ const NUCLEAR_IDLE_HOURS = 4;
 // ─── Topic Grouping constants ───────────────────────────────────
 const TOPIC_GROUPING_ALARM = 'topic-grouping';
 const TOPIC_GROUPING_MIN_TABS = 4;
+
+// ─── Archive Purge constants ───────────────────────────────────
+const PURGE_ALARM_NAME = 'archive-purge';
+const PURGE_INTERVAL_MINUTES = 1440; // once per day
 
 // ─── Notification-based Stay of Execution ───────────────────────
 const STAY_NOTIF_PREFIX = 'closure-stay-';
@@ -480,6 +486,31 @@ async function runTopicGrouping({ manual = false } = {}) {
 
 // ─── Offscreen AI Helpers ───────────────────────────────────────
 
+// ─── Archive Purge ──────────────────────────────────────────────
+
+/**
+ * Delete archived entries older than the configured retention period.
+ * Runs daily via chrome.alarms. Skips when retention is 0 (keep forever).
+ */
+async function runArchivePurge() {
+  const { config, archived } = await chrome.storage.local.get(['config', 'archived']);
+  const retentionDays = config?.archiveRetentionDays ?? 0;
+
+  // 0 = keep forever
+  if (retentionDays === 0 || !archived || archived.length === 0) return;
+
+  const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+  const remaining = archived.filter((entry) => (entry.timestamp || 0) >= cutoff);
+
+  if (remaining.length < archived.length) {
+    const purged = archived.length - remaining.length;
+    console.debug(`[Closure:Purge] Removed ${purged} archived entries older than ${retentionDays} days`);
+    await chrome.storage.local.set({ archived: remaining });
+  }
+}
+
+// ─── Offscreen AI Helpers (continued) ───────────────────────────
+
 /**
  * Ensure the offscreen document exists. Chrome only allows one
  * offscreen document per extension at a time.
@@ -900,7 +931,7 @@ function sendArchivalNotification(pageTitle) {
     type: 'basic',
     iconUrl: 'icons/icon-128.png',
     title: 'Tab Archived',
-    message: `Moved "${truncated}" to your Sunday Digest. Summary saved.`,
+    message: `Moved "${truncated}" to Memory Lane. Summary saved.`,
     priority: 0,
   });
 }
@@ -1019,6 +1050,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
   // Schedule topic grouping if enabled
   await scheduleTopicGroupingAlarm();
+
+  // Schedule daily archive purge
+  chrome.alarms.create(PURGE_ALARM_NAME, {
+    delayInMinutes: 60,
+    periodInMinutes: PURGE_INTERVAL_MINUTES,
+  });
 });
 
 // Tab created — evaluate grouping for the new tab's domain
@@ -1081,6 +1118,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     return;
   }
 
+  if (alarm.name === PURGE_ALARM_NAME) {
+    await runArchivePurge();
+    return;
+  }
+
   // Snooze alarm expired — tab is eligible for archival again
   if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
     // No action needed; the snooze alarm simply expires
@@ -1115,6 +1157,55 @@ chrome.notifications.onButtonClicked.addListener((notifId, buttonIndex) => {
 chrome.notifications.onClosed.addListener((notifId, byUser) => {
   // If user dismissed without choosing → tab proceeds to archival (no action needed)
 });
+
+// ─── Single-Tab Ungroup ─────────────────────────────────────────
+// When a tab is removed (closed or moved out), check if its former
+// group now has only one tab left. If so, ungroup that last tab —
+// a single-tab group adds visual clutter with no organizational value.
+
+chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
+  // When a window is closing, all its tabs fire onRemoved — skip to
+  // avoid racing against the browser tearing down groups.
+  if (removeInfo.isWindowClosing) return;
+
+  try {
+    await dissolveOrphanedGroups();
+  } catch (err) {
+    console.debug('[Closure] Single-tab ungroup error (onRemoved):', err.message);
+  }
+});
+
+// Also handle tabs moved out of a group (e.g. user drags a tab out,
+// or evaluateAutoGroup ungroups a mismatched tab).
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // Only fire when groupId actually changed (not every update)
+  if (!('groupId' in changeInfo)) return;
+
+  try {
+    await dissolveOrphanedGroups();
+  } catch (err) {
+    console.debug('[Closure] Single-tab ungroup error (onUpdated):', err.message);
+  }
+});
+
+/**
+ * Find all tab groups that now contain only one tab and ungroup
+ * that remaining tab, effectively dissolving the group.
+ *
+ * Runs after any tab removal or group-membership change so that
+ * the user never sees a pointless single-tab group.
+ */
+async function dissolveOrphanedGroups() {
+  const allGroups = await chrome.tabGroups.query({});
+
+  for (const group of allGroups) {
+    const tabs = await chrome.tabs.query({ groupId: group.id });
+    if (tabs.length === 1) {
+      await chrome.tabs.ungroup(tabs[0].id);
+    }
+    // Note: groups with 0 tabs are already auto-deleted by Chrome
+  }
+}
 
 // Message handler for popup communication
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

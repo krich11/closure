@@ -221,6 +221,39 @@
     @apply opacity-50 cursor-not-allowed;
   }
 
+  .btn-sm {
+    @apply py-1.5 px-3 text-sm;
+  }
+
+  /* ── Search Bar ───────────────────────────────────────────────── */
+  .search-bar {
+    @apply mb-8;
+  }
+
+  .search-input {
+    @apply w-full py-3 px-4 bg-card rounded-lg text-ink text-base font-sans;
+    border: 1px solid var(--color-border);
+    transition: border-color 0.2s;
+  }
+
+  .search-input::placeholder {
+    @apply text-ink-muted;
+  }
+
+  .search-input:focus {
+    border-color: var(--color-warm);
+    outline: none;
+  }
+
+  /* ── Export Bar ────────────────────────────────────────────────── */
+  .export-bar {
+    @apply flex items-center justify-center gap-3 mb-10;
+  }
+
+  .export-label {
+    @apply text-sm text-ink-muted;
+  }
+
   /* ── Footer / Donation (Gratitude) ────────────────────────────── */
   .digest-footer {
     @apply mt-16 pt-10 text-center;

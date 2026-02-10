@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Closure — Sunday Digest (digest.js)
- * @version 1.5.0
+ * Closure — Memory Lane (digest.js)
+ * @version 1.6.0
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -11,8 +11,11 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   renderDate();
+  await loadSortPreference();
   await loadAndRenderContent();
   setupSortControl();
+  setupSearchFilter();
+  setupExportButtons();
 });
 
 // Update the masthead date to today or "Sunday, Month Day"
@@ -22,6 +25,19 @@ function renderDate() {
     const now = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     dateEl.textContent = now.toLocaleDateString('en-US', options);
+  }
+}
+
+/**
+ * Load the user's saved sort preference from config.
+ * Falls back to 'recency' if not set.
+ */
+async function loadSortPreference() {
+  const { config } = await chrome.storage.local.get('config');
+  const sortBy = config?.archiveSortBy || 'recency';
+  const sortSelect = document.getElementById('sort-select');
+  if (sortSelect) {
+    sortSelect.value = sortBy;
   }
 }
 
@@ -215,11 +231,18 @@ async function setupEventListeners() {
 
 /**
  * Re-sort the archive feed when the sort control changes.
+ * Persists the preference to config so it's remembered across sessions.
  */
 function setupSortControl() {
   const sortSelect = document.getElementById('sort-select');
   if (sortSelect) {
     sortSelect.addEventListener('change', async () => {
+      // Persist sort preference
+      const { config } = await chrome.storage.local.get('config');
+      if (config) {
+        config.archiveSortBy = sortSelect.value;
+        await chrome.storage.local.set({ config });
+      }
       await loadAndRenderContent();
     });
   }
@@ -333,4 +356,141 @@ function groupBy(array, key) {
     (result[groupKey] = result[groupKey] || []).push(currentValue);
     return result;
   }, {});
+}
+
+// ─── Search / Filter ────────────────────────────────────────────
+
+/**
+ * Set up the search input to filter archive cards in real-time.
+ * Matches against title, URL, summary, and domain.
+ */
+function setupSearchFilter() {
+  const searchInput = document.getElementById('search-input');
+  if (!searchInput) return;
+
+  let debounceTimer;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      applySearchFilter(searchInput.value.trim().toLowerCase());
+    }, 200);
+  });
+}
+
+/**
+ * Show/hide archive cards and groups based on a search query.
+ * Empty query shows everything.
+ */
+function applySearchFilter(query) {
+  const groups = document.querySelectorAll('.archive-group');
+  const emptyState = document.querySelector('.empty-state');
+  const noResults = document.getElementById('no-results');
+
+  if (!query) {
+    // Show everything
+    groups.forEach((g) => { g.hidden = false; });
+    groups.forEach((g) => {
+      g.querySelectorAll('.archive-card').forEach((c) => { c.hidden = false; });
+    });
+    if (noResults) noResults.hidden = true;
+    return;
+  }
+
+  let anyVisible = false;
+
+  groups.forEach((group) => {
+    const cards = group.querySelectorAll('.archive-card');
+    let groupHasVisible = false;
+
+    cards.forEach((card) => {
+      const text = card.textContent.toLowerCase();
+      const matchesSearch = text.includes(query);
+      card.hidden = !matchesSearch;
+      if (matchesSearch) groupHasVisible = true;
+    });
+
+    group.hidden = !groupHasVisible;
+    if (groupHasVisible) anyVisible = true;
+  });
+
+  // Show "no results" message if nothing matches
+  if (noResults) {
+    noResults.hidden = anyVisible;
+  }
+}
+
+// ─── Export ──────────────────────────────────────────────────────
+
+/**
+ * Set up export buttons for JSON and CSV download.
+ */
+function setupExportButtons() {
+  const jsonBtn = document.getElementById('export-json');
+  const csvBtn = document.getElementById('export-csv');
+
+  if (jsonBtn) {
+    jsonBtn.addEventListener('click', async () => {
+      const { archived } = await chrome.storage.local.get('archived');
+      if (!archived || archived.length === 0) return;
+
+      const blob = new Blob([JSON.stringify(archived, null, 2)], { type: 'application/json' });
+      downloadBlob(blob, `closure-archive-${formatDateForFilename()}.json`);
+    });
+  }
+
+  if (csvBtn) {
+    csvBtn.addEventListener('click', async () => {
+      const { archived } = await chrome.storage.local.get('archived');
+      if (!archived || archived.length === 0) return;
+
+      const csv = archiveToCsv(archived);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      downloadBlob(blob, `closure-archive-${formatDateForFilename()}.csv`);
+    });
+  }
+}
+
+/**
+ * Convert archived entries to CSV format.
+ */
+function archiveToCsv(archived) {
+  const headers = ['Title', 'URL', 'Domain', 'Summary', 'Summary Type', 'Archived At'];
+  const rows = archived.map((item) => [
+    escapeCsv(item.title || ''),
+    escapeCsv(item.url || ''),
+    escapeCsv(item.domain || ''),
+    escapeCsv(item.summary || ''),
+    escapeCsv(item.summaryType || ''),
+    escapeCsv(new Date(item.timestamp).toISOString()),
+  ]);
+
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+}
+
+function escapeCsv(value) {
+  const str = String(value).replace(/"/g, '""');
+  return `"${str}"`;
+}
+
+/**
+ * Trigger a file download from a Blob — no network request needed.
+ */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  // Clean up after a tick
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 100);
+}
+
+function formatDateForFilename() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

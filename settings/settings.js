@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.5.0
+ * @version 1.6.0
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -13,9 +13,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   bindRangeSlider('group-threshold', 'group-threshold-value', cfg.groupThreshold ?? 3, formatInt);
   bindRangeSlider('idle-threshold', 'idle-threshold-value', cfg.idleThresholdHours ?? 24, v => `${v}h`);
+  bindRangeSlider('retention-days', 'retention-days-value', cfg.archiveRetentionDays ?? 0, formatRetention);
 
   bindToggle('enable-clustering', cfg.enableThematicClustering ?? false);
   bindToggle('high-contrast', cfg.highContrastMode ?? false);
+
+  // Archive sort preference
+  bindSelect('archive-sort', cfg.archiveSortBy ?? 'recency');
 
   // Rich page analysis — permission-gated, handled separately from normal toggles
   await initRichAnalysisToggle(cfg.enableRichPageAnalysis ?? false);
@@ -58,6 +62,18 @@ function bindRangeSlider(inputId, outputId, initialValue, formatter) {
 
 function formatInt(v) {
   return String(v);
+}
+
+function formatRetention(v) {
+  const days = parseInt(v, 10);
+  if (days === 0) return 'Forever';
+  if (days === 1) return '1 day';
+  if (days < 30) return `${days} days`;
+  if (days < 365) {
+    const months = Math.round(days / 30);
+    return months === 1 ? '~1 month' : `~${months} months`;
+  }
+  return '1 year';
 }
 
 // ─── Select Binding ───────────────────────────────────────────────
@@ -208,6 +224,8 @@ async function saveConfig() {
   const newConfig = {
     groupThreshold: parseInt(document.getElementById('group-threshold')?.value, 10) || 3,
     idleThresholdHours: parseInt(document.getElementById('idle-threshold')?.value, 10) || 24,
+    archiveRetentionDays: parseInt(document.getElementById('retention-days')?.value, 10) || 0,
+    archiveSortBy: document.getElementById('archive-sort')?.value || 'recency',
     enableThematicClustering: document.getElementById('enable-clustering')?.getAttribute('aria-checked') === 'true',
     enableRichPageAnalysis: document.getElementById('enable-rich-analysis')?.getAttribute('aria-checked') === 'true',
     enableTopicGrouping: document.getElementById('enable-topic-grouping')?.getAttribute('aria-checked') === 'true',

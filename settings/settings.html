@@ -25,7 +25,7 @@
         <div class="field field-toggle">
           <label for="enable-clustering" class="field-label">
             Thematic clustering
-            <span class="field-hint">In Sunday Digest, re-group archived tabs by topic instead of domain — e.g. tabs from different sites about "React performance" are clustered together</span>
+            <span class="field-hint">In Memory Lane, re-group archived tabs by topic instead of domain — e.g. tabs from different sites about "React performance" are clustered together</span>
           </label>
           <button id="enable-clustering" class="toggle" role="switch" aria-checked="false" type="button">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -122,7 +122,7 @@
       <!-- Graceful Exit -->
       <section class="settings-section" aria-labelledby="section-idle">
         <h2 id="section-idle" class="section-title">Graceful Exit</h2>
-        <p class="section-desc">Tabs you haven't touched in a while are archived: their content is summarized by on-device AI, then the tab is closed. You'll get a "Stay of Execution" warning 10 minutes before, and everything is saved to your Sunday Digest.</p>
+        <p class="section-desc">Tabs you haven't touched in a while are archived: their content is summarized by on-device AI, then the tab is closed. You'll get a "Stay of Execution" warning 10 minutes before, and everything is saved to Memory Lane.</p>
 
         <div class="field">
           <label for="idle-threshold" class="field-label">
@@ -131,6 +131,32 @@
           </label>
           <input type="range" id="idle-threshold" min="4" max="168" step="4" value="24" aria-valuemin="4" aria-valuemax="168">
           <output id="idle-threshold-value" class="range-output" for="idle-threshold">24h</output>
+        </div>
+      </section>
+
+      <!-- Memory Lane -->
+      <section class="settings-section" aria-labelledby="section-memory-lane">
+        <h2 id="section-memory-lane" class="section-title">Memory Lane</h2>
+        <p class="section-desc">Your archive of all closed tabs with summaries. Configure how long entries are kept and how they're sorted by default.</p>
+
+        <div class="field">
+          <label for="retention-days" class="field-label">
+            Archive retention
+            <span class="field-hint">Automatically delete archived entries older than this. Set to "Forever" to keep everything.</span>
+          </label>
+          <input type="range" id="retention-days" min="0" max="365" step="1" value="0" aria-valuemin="0" aria-valuemax="365">
+          <output id="retention-days-value" class="range-output" for="retention-days">Forever</output>
+        </div>
+
+        <div class="field">
+          <label for="archive-sort" class="field-label">
+            Default sort order
+            <span class="field-hint">How archived tabs are sorted when you open Memory Lane</span>
+          </label>
+          <select id="archive-sort" class="field-select">
+            <option value="recency">Most recent first</option>
+            <option value="domain">By domain (A–Z)</option>
+          </select>
         </div>
       </section>
 
@@ -185,7 +211,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.5.0 — 100% local, 100% private.</p>
+      <p>Closure v1.6.0 — 100% local, 100% private.</p>
     </footer>
   </div>
 
