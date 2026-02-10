@@ -231,7 +231,7 @@ function setupSortControl() {
 async function isAiAvailable() {
   try {
     if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability();
+      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'] });
       return availability === 'available' || availability === 'readily';
     }
     if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
@@ -247,7 +247,7 @@ async function isAiAvailable() {
  */
 async function createAiSession() {
   if (typeof LanguageModel !== 'undefined') {
-    return await LanguageModel.create();
+    return await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
   }
   if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
     return await window.ai.languageModel.create();

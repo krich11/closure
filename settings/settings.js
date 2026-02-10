@@ -115,16 +115,17 @@ async function checkAiAvailability() {
   try {
     // Try the new global LanguageModel API (Chrome 138+), then fall back to legacy window.ai
     if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability();
+      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'] });
       if (availability === 'available' || availability === 'readily') {
         statusEl.textContent = 'On-device AI is available and ready.';
         statusEl.className = 'ai-status ai-status--available';
         aiAvailable = true;
       } else if (availability === 'downloadable' || availability === 'after-download' || availability === 'downloading') {
-        statusEl.textContent = 'On-device AI model needs to download first. Open chrome://components and click "Check for update" on Optimization Guide On Device Model.';
+        statusEl.textContent = `On-device AI adapter status: "${availability}". The base model is installed but the Prompt API adapter needs to download.`;
         statusEl.className = 'ai-status ai-status--pending';
+        showDownloadButton();
       } else {
-        statusEl.textContent = 'On-device AI is not available. Summaries will use fallback text.';
+        statusEl.textContent = `On-device AI is not available (status: "${availability}"). Make sure both flags are enabled and Chrome has been fully restarted. Summaries will use fallback text.`;
         statusEl.className = 'ai-status ai-status--unavailable';
       }
     } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
@@ -157,6 +158,52 @@ async function checkAiAvailability() {
 
   // Wire up chrome:// link click handlers
   setupChromeLinks();
+}
+
+/**
+ * Show and wire the "Download AI Model" button.
+ * Calling LanguageModel.create() when status is "downloadable" triggers
+ * Chrome to pull the kPromptApi adaptation automatically.
+ */
+function showDownloadButton() {
+  const btn = document.getElementById('ai-download-btn');
+  const statusEl = document.getElementById('ai-status');
+  if (!btn) return;
+
+  btn.hidden = false;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Downloading…';
+    statusEl.textContent = 'Downloading AI adapter — this may take a few minutes…';
+    statusEl.className = 'ai-status ai-status--pending';
+
+    try {
+      const session = await LanguageModel.create({
+        expectedInputLanguages: ['en'],
+        outputLanguage: 'en',
+        monitor(m) {
+          m.addEventListener('downloadprogress', (e) => {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            btn.textContent = `Downloading… ${pct}%`;
+            statusEl.textContent = `Downloading AI adapter: ${pct}%`;
+          });
+        },
+      });
+      session.destroy();
+
+      btn.hidden = true;
+      statusEl.textContent = 'On-device AI is available and ready.';
+      statusEl.className = 'ai-status ai-status--available';
+
+      const guideEl = document.getElementById('ai-setup-guide');
+      if (guideEl) guideEl.hidden = true;
+    } catch (err) {
+      btn.textContent = 'Download failed — Retry';
+      btn.disabled = false;
+      statusEl.textContent = `AI adapter download failed: ${err.message}. Try restarting Chrome and clicking again.`;
+      statusEl.className = 'ai-status ai-status--unavailable';
+    }
+  }, { once: true });
 }
 
 /**

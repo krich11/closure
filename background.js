@@ -601,9 +601,9 @@ async function contentScriptSummarize(title, metaDescription, text) {
 
     // Try the new global LanguageModel API first (Chrome 138+)
     if (typeof LanguageModel !== 'undefined') {
-      const availability = await LanguageModel.availability();
+      const availability = await LanguageModel.availability({ expectedInputLanguages: ['en'] });
       if (availability === 'unavailable') return null;
-      session = await LanguageModel.create();
+      session = await LanguageModel.create({ expectedInputLanguages: ['en'], outputLanguage: 'en' });
     } else if (typeof window.ai !== 'undefined' && window.ai?.languageModel) {
       // Legacy fallback
       const capabilities = await window.ai.languageModel.capabilities?.();
