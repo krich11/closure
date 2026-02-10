@@ -12,6 +12,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   renderDate();
   await loadAndRenderContent();
+  setupSortControl();
 });
 
 // Update the masthead date to today or "Sunday, Month Day"
@@ -51,14 +52,23 @@ async function loadAndRenderContent() {
   feedEl.innerHTML = '';
   
   // Group by Domain (default)
-  // In Phase 3 (Soul), we might add "Cluster by Theme" here
+  const sortMode = document.getElementById('sort-select')?.value || 'recency';
   const groups = groupBy(archived, 'domain');
   
-  // Sort domains alphabetically for stability, or by count
-  const sortedDomains = Object.keys(groups).sort();
+  // Sort domains: by most recent entry timestamp (recency) or alphabetically
+  const sortedDomains = Object.keys(groups).sort((a, b) => {
+    if (sortMode === 'recency') {
+      const latestA = Math.max(...groups[a].map(i => i.timestamp || 0));
+      const latestB = Math.max(...groups[b].map(i => i.timestamp || 0));
+      return latestB - latestA; // newest first
+    }
+    return a.localeCompare(b);
+  });
 
   sortedDomains.forEach(domain => {
     const items = groups[domain];
+    // Sort items within group by recency (newest first)
+    items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     
     // Create Group Section
     const groupSection = document.createElement('section');
@@ -100,19 +110,20 @@ function createCard(item) {
   // Safe Fallbacks
   const title = item.title || 'Untitled Page';
   const url = item.url || '#';
-  const displayTime = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const archiveDate = new Date(item.timestamp);
+  const displayDate = archiveDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const displayTime = archiveDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
   // Summary Handling
   let summaryHtml = '';
-  if (item.summaryType === 'ai' && item.summary) {
-    // Expecting summary to be a string of bullets or text
-    // If it's pure text, wrap in p. If it looks like a list, parse it.
-    // For now, assume simple text block or pre-formatted bullets.
-    summaryHtml = `<div class="card-summary">${formatSummary(item.summary)}</div>`;
-  } else {
-    // Fallback: snippet of text
-    const snippet = (item.fallbackText || '').substring(0, 150) + '...';
-    summaryHtml = `<div class="card-summary"><p>${snippet}</p></div>`;
+  if (item.summary) {
+    if (item.summaryType === 'ai') {
+      summaryHtml = `<div class="card-summary">${formatSummary(item.summary)}</div>`;
+    } else {
+      // Fallback summary — show a truncated snippet
+      const snippet = item.summary.substring(0, 200);
+      summaryHtml = `<div class="card-summary"><p>${snippet}</p></div>`;
+    }
   }
   
   card.innerHTML = `
@@ -124,7 +135,7 @@ function createCard(item) {
       ${summaryHtml}
     </div>
     <div class="card-footer">
-      <span class="timestamp">Archived ${displayTime}</span>
+      <span class="timestamp">Archived ${displayDate} at ${displayTime}</span>
       <button class="restore-btn" data-url="${url}">Restore Tab</button>
     </div>
   `;
@@ -170,16 +181,105 @@ function setupEventListeners() {
     }
   });
 
-  // Cluster button (Stub for Phase 3)
+  // Cluster button — enable when window.ai is available
   const clusterBtn = document.getElementById('cluster-btn');
   if (clusterBtn) {
-    if (window.ai) {
+    if (typeof window.ai !== 'undefined' && window.ai) {
       clusterBtn.disabled = false;
-      clusterBtn.addEventListener('click', () => {
-        alert('AI Clustering coming in Phase 3!');
+      clusterBtn.addEventListener('click', async () => {
+        clusterBtn.disabled = true;
+        clusterBtn.textContent = 'Clustering...';
+        try {
+          await clusterByTheme();
+        } catch (err) {
+          console.error('[Closure] Clustering error:', err);
+          clusterBtn.textContent = 'Clustering failed';
+        }
       });
     }
   }
+}
+
+/**
+ * Re-sort the archive feed when the sort control changes.
+ */
+function setupSortControl() {
+  const sortSelect = document.getElementById('sort-select');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', async () => {
+      await loadAndRenderContent();
+    });
+  }
+}
+
+/**
+ * Attempt thematic clustering of archived entries via window.ai.
+ * Re-renders the feed grouped by AI-suggested themes instead of domain.
+ */
+async function clusterByTheme() {
+  const { archived } = await chrome.storage.local.get('archived');
+  if (!archived || archived.length === 0) return;
+
+  // Build a summary of all entries for clustering
+  const summaries = archived.map((item, i) =>
+    `[${i}] ${item.title}: ${(item.summary || '').substring(0, 100)}`
+  ).join('\n');
+
+  try {
+    const session = await window.ai.languageModel.create();
+    const prompt = `Group these summaries into thematic clusters and suggest short cluster titles. Return JSON: { "clusters": [{ "title": "...", "indices": [0, 1, ...] }] }\n\n${summaries}`;
+    const result = await session.prompt(prompt);
+    session.destroy();
+
+    // Try to parse the AI response as JSON
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      renderClusters(parsed.clusters, archived);
+    }
+  } catch {
+    // AI clustering failed — fall back to domain grouping
+    await loadAndRenderContent();
+  }
+}
+
+/**
+ * Render archive entries grouped by AI-suggested thematic clusters.
+ */
+function renderClusters(clusters, archived) {
+  const feedEl = document.getElementById('archive-feed');
+  feedEl.innerHTML = '';
+
+  for (const cluster of clusters) {
+    const groupSection = document.createElement('section');
+    groupSection.className = 'archive-group';
+
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = `
+      <h3 class="group-title">${cluster.title || 'CLUSTER'}</h3>
+      <div class="group-actions">
+        <button class="restore-group-btn" data-indices="${cluster.indices.join(',')}">Restore Group</button>
+      </div>
+    `;
+    groupSection.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.style.display = 'flex';
+    grid.style.flexDirection = 'column';
+    grid.style.gap = '1.5rem';
+
+    for (const idx of cluster.indices) {
+      if (archived[idx]) {
+        grid.appendChild(createCard(archived[idx]));
+      }
+    }
+
+    groupSection.appendChild(grid);
+    feedEl.appendChild(groupSection);
+  }
+
+  setupEventListeners();
 }
 
 // Utility: Group array of objects by key

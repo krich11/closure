@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/* ─── Closure Design Tokens (Zen / Warm Editorial) ─────────────── */
+@theme {
+  --color-paper: #fdfbf7;
+  --color-card: #ffffff;
+  --color-ink: #2d2a26;
+  --color-ink-secondary: #5e5b56;
+  --color-ink-muted: #8c8984;
+  --color-warm: #d4a373;
+  --color-warm-hover: #c59060;
+  --color-sage: #e9edc9;
+  --color-border: #e6e2dd;
+  --color-green: #6b9e6b;
+  --color-yellow: #d4a373;
+  --color-red: #c45c5c;
+
+  --font-serif: 'Georgia', 'Times New Roman', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ─── Base Layer ───────────────────────────────────────────────── */
+@layer base {
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-serif;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  select:focus-visible {
+    @apply outline-2 outline-warm outline-offset-2;
+  }
+}

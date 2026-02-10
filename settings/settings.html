@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Closure</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="settings-container">
+    <header class="settings-header">
+      <div class="header-brand">
+        <img src="../icons/icon-48.png" alt="Closure Icon" class="header-logo">
+        <h1>Settings</h1>
+      </div>
+      <p class="header-subtitle">Fine-tune how Closure cares for your tabs.</p>
+    </header>
+
+    <main>
+      <!-- Auto-Grouping -->
+      <section class="settings-section" aria-labelledby="section-grouping">
+        <h2 id="section-grouping" class="section-title">Clean Slate Automator</h2>
+        <p class="section-desc">Tabs from the same domain are grouped together when the count reaches this threshold.</p>
+
+        <div class="field">
+          <label for="group-threshold" class="field-label">
+            Group threshold
+            <span class="field-hint">Tabs needed before auto-grouping (3–10)</span>
+          </label>
+          <input type="range" id="group-threshold" min="3" max="10" step="1" value="3" aria-valuemin="3" aria-valuemax="10">
+          <output id="group-threshold-value" class="range-output" for="group-threshold">3</output>
+        </div>
+
+        <div class="field">
+          <label for="collapse-hours" class="field-label">
+            Auto-collapse after
+            <span class="field-hint">Hours before a group collapses (1–24)</span>
+          </label>
+          <input type="range" id="collapse-hours" min="1" max="24" step="1" value="3" aria-valuemin="1" aria-valuemax="24">
+          <output id="collapse-hours-value" class="range-output" for="collapse-hours">3h</output>
+        </div>
+      </section>
+
+      <!-- Graceful Exit -->
+      <section class="settings-section" aria-labelledby="section-idle">
+        <h2 id="section-idle" class="section-title">Graceful Exit</h2>
+        <p class="section-desc">Idle tabs are summarized and archived to your Sunday Digest after this threshold.</p>
+
+        <div class="field">
+          <label for="idle-threshold" class="field-label">
+            Idle threshold
+            <span class="field-hint">Hours before a tab is considered idle (4–168)</span>
+          </label>
+          <input type="range" id="idle-threshold" min="4" max="168" step="4" value="24" aria-valuemin="4" aria-valuemax="168">
+          <output id="idle-threshold-value" class="range-output" for="idle-threshold">24h</output>
+        </div>
+      </section>
+
+      <!-- AI & Clustering -->
+      <section class="settings-section" aria-labelledby="section-ai">
+        <h2 id="section-ai" class="section-title">AI Features</h2>
+        <p class="section-desc">Powered entirely by on-device AI. No data ever leaves your machine.</p>
+
+        <div class="field field-toggle">
+          <label for="enable-clustering" class="field-label">
+            Thematic clustering
+            <span class="field-hint">Group archived tabs by topic in Sunday Digest</span>
+          </label>
+          <button id="enable-clustering" class="toggle" role="switch" aria-checked="false" type="button">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </button>
+        </div>
+
+        <div id="ai-status" class="ai-status" role="status" aria-live="polite"></div>
+      </section>
+
+      <!-- Whitelist -->
+      <section class="settings-section" aria-labelledby="section-whitelist">
+        <h2 id="section-whitelist" class="section-title">Whitelist</h2>
+        <p class="section-desc">Domains on this list are immune to grouping, sweeping, and archival.</p>
+
+        <div class="field">
+          <label for="whitelist-input" class="field-label sr-only">Add domain to whitelist</label>
+          <div class="whitelist-input-row">
+            <input type="text" id="whitelist-input" placeholder="example.com" autocomplete="off" spellcheck="false">
+            <button id="whitelist-add" class="btn btn-small" type="button" aria-label="Add domain to whitelist">Add</button>
+          </div>
+        </div>
+
+        <ul id="whitelist-entries" class="whitelist-list" aria-label="Whitelisted domains">
+          <!-- Dynamically populated -->
+        </ul>
+
+        <p id="whitelist-empty" class="whitelist-empty">No domains whitelisted yet.</p>
+      </section>
+
+      <!-- Accessibility -->
+      <section class="settings-section" aria-labelledby="section-a11y">
+        <h2 id="section-a11y" class="section-title">Accessibility</h2>
+
+        <div class="field field-toggle">
+          <label for="high-contrast" class="field-label">
+            High-contrast mode
+            <span class="field-hint">Increases contrast for better readability</span>
+          </label>
+          <button id="high-contrast" class="toggle" role="switch" aria-checked="false" type="button">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Incognito Warning -->
+      <section id="incognito-section" class="settings-section settings-section--warning" aria-labelledby="section-incognito" hidden>
+        <h2 id="section-incognito" class="section-title">Incognito Mode</h2>
+        <div class="warning-banner" role="alert">
+          <p><strong>Warning:</strong> Closure is enabled in incognito mode. While Closure never transmits data, archived tab records from incognito windows will be stored locally alongside your regular browsing data.</p>
+          <p>Disable incognito access in <code>chrome://extensions</code> if this concerns you.</p>
+        </div>
+      </section>
+
+      <!-- Save / Status -->
+      <div class="settings-actions">
+        <div id="save-status" class="save-status" role="status" aria-live="polite"></div>
+      </div>
+    </main>
+
+    <footer class="settings-footer">
+      <p>Closure v1.1.0 — 100% local, 100% private.</p>
+    </footer>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

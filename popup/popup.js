@@ -49,6 +49,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Settings link
+  const settingsLink = document.getElementById('open-settings');
+  if (settingsLink) {
+    settingsLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: chrome.runtime.getURL('settings/settings.html') });
+    });
+  }
+
   // Nuclear Archive button
   const archiveBtn = document.getElementById('archive-now');
   if (archiveBtn) {
@@ -99,6 +108,7 @@ function showNuclearToast(count) {
 
   const toast = document.createElement('div');
   toast.id = 'nuclear-toast';
+  toast.className = 'nuclear-toast';
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
 

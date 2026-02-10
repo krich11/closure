@@ -6,15 +6,20 @@ Implement a privacy-first Chromium extension (MV3) that tidies tabs, archives id
 
 ## Current State
 
-Phase 1 (The Mechanic) is partially complete:
+Phase 3 (The Soul) is complete:
 - ✅ Storage schema initialization + migration scaffold
 - ✅ Clean Slate Automator (auto-grouping) with deterministic colors + auto-collapse
 - ✅ Safety net: pinned/audible immunity + whitelist enforcement
-- ✅ Zen Popup stub with status ring + tab count
-- ✅ Sunday Digest stub with domain grouping + restore buttons
-- ✅ Playwright test suite (5 spec files, all passing)
-- ❌ Dead End Sweeper (error detection + sweep)
-- ❌ Content script (`content.js`)
+- ✅ Zen Popup with status ring, tab count, nuclear archive, settings link
+- ✅ Sunday Digest with domain grouping, recency sorting, thematic clustering, restore
+- ✅ Dead End Sweeper (error detection + sweep)
+- ✅ Content script (`content.js`)
+- ✅ Graceful Exit (AI archival + Stay of Execution + notifications)
+- ✅ Settings page (thresholds, whitelist, high-contrast, AI status)
+- ✅ Onboarding page (4-step first-run experience)
+- ✅ Tailwind CSS build pipeline (popup, digest, settings, onboarding)
+- ✅ Gratitude donation footer + post-nuclear toasts
+- ✅ Playwright test suite (7 spec files, all passing)
 
 ## Delivery Phases
 
@@ -40,13 +45,13 @@ Phase 1 (The Mechanic) is partially complete:
 
 ### Phase 3: The Soul
 
-- [ ] Settings page (`settings/`) with configurable thresholds, whitelist management, high-contrast toggle.
-- [ ] Onboarding page (`onboarding/`) with permission justification.
-- [ ] Sunday Digest: optional thematic clustering via `window.ai`.
-- [ ] Digest: sort by recency within groups.
-- [ ] Donation trigger toasts in popup after large sweeps.
-- [ ] Accessibility polish: focus indicators, ARIA labels audit, high-contrast mode.
-- [ ] Edge case hardening: multiple windows, incognito warning, low-end hardware.
+- [x] Settings page (`settings/`) with configurable thresholds, whitelist management, high-contrast toggle.
+- [x] Onboarding page (`onboarding/`) with permission justification.
+- [x] Sunday Digest: optional thematic clustering via `window.ai`.
+- [x] Digest: sort by recency within groups.
+- [x] Donation trigger toasts in popup after large sweeps.
+- [x] Accessibility polish: focus indicators, ARIA labels audit, high-contrast mode.
+- [x] Edge case hardening: multiple windows, incognito warning, low-end hardware.
 
 ## Directory Structure
 
@@ -88,7 +93,7 @@ tests/
   dead-end-sweeper.spec.js
 ```
 
-Files not yet created: `settings/`, `onboarding/`.
+Files not yet created: none — all pages implemented.
 
 ## Manifest V3 Permission Map
 

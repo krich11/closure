@@ -856,6 +856,12 @@ let sweepInProgress = false;
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     await chrome.storage.local.set(DEFAULT_STORAGE);
+
+    // Open the onboarding page on first install
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('onboarding/onboarding.html'),
+      active: true,
+    });
   } else if (details.reason === 'update') {
     // Future: schema migration logic
     const data = await chrome.storage.local.get('schema_version');

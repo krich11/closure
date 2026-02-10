@@ -6,17 +6,18 @@
   <title>Closure</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
-  <main id="popup-main">
-    <h1>Closure</h1>
-    <div id="status-ring" role="status" aria-live="polite" aria-label="Browser health indicator"></div>
-    <p id="tab-count" aria-live="polite"></p>
-    <button id="archive-now" type="button" aria-label="Archive all idle tabs now">Archive Idle Tabs Now</button>
-    <div id="stats" aria-live="polite">
+<body class="popup-body">
+  <main id="popup-main" class="popup-main">
+    <h1 class="popup-title">Closure</h1>
+    <div id="status-ring" class="status-ring" role="status" aria-live="polite" aria-label="Browser health indicator"></div>
+    <p id="tab-count" class="tab-count" aria-live="polite"></p>
+    <button id="archive-now" class="btn-archive" type="button" aria-label="Archive all idle tabs now">Archive Idle Tabs Now</button>
+    <div id="stats" class="stats-section" aria-live="polite">
       <p id="tabs-tidied"></p>
       <p id="ram-saved"></p>
     </div>
-    <a id="open-digest" href="#" role="link" aria-label="Open Sunday Digest">Sunday Digest</a>
+    <a id="open-digest" class="digest-link" href="#" role="link" aria-label="Open Sunday Digest">Sunday Digest</a>
+    <a id="open-settings" class="settings-link" href="#" role="link" aria-label="Open Settings">Settings</a>
   </main>
   <script src="popup.js"></script>
 </body>

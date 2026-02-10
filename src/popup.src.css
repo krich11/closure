@@ -1,0 +1,120 @@
+@import "../src/shared.css";
+
+/* ─── Popup-specific styles ────────────────────────────────────── */
+@layer components {
+  .popup-body {
+    @apply w-80 m-0 p-0;
+  }
+
+  .popup-main {
+    @apply p-5 flex flex-col items-center gap-3;
+  }
+
+  .popup-title {
+    @apply font-serif text-xl font-bold tracking-tight m-0 text-ink;
+    letter-spacing: -0.02em;
+  }
+
+  /* Status Ring */
+  .status-ring {
+    @apply w-16 h-16 rounded-full border-4 border-border;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .status-ring[data-health="green"] {
+    @apply border-green;
+    box-shadow: 0 0 8px rgba(107, 158, 107, 0.3);
+  }
+
+  .status-ring[data-health="yellow"] {
+    @apply border-yellow;
+    box-shadow: 0 0 8px rgba(212, 163, 115, 0.3);
+  }
+
+  .status-ring[data-health="red"] {
+    @apply border-red;
+    box-shadow: 0 0 8px rgba(196, 92, 92, 0.3);
+  }
+
+  .tab-count {
+    @apply text-sm text-ink-secondary m-0;
+  }
+
+  /* Archive Button */
+  .btn-archive {
+    @apply w-full py-2.5 px-4 bg-warm text-white border-none rounded font-sans text-sm font-medium cursor-pointer;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .btn-archive:hover {
+    @apply bg-warm-hover;
+  }
+
+  .btn-archive:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  /* Stats */
+  .stats-section p {
+    @apply my-0.5 text-xs text-ink-muted;
+  }
+
+  /* Digest Link */
+  .digest-link {
+    @apply text-sm text-warm underline cursor-pointer;
+    text-underline-offset: 3px;
+    transition: color 0.2s;
+  }
+
+  .digest-link:hover {
+    @apply text-ink;
+  }
+
+  /* Settings Link */
+  .settings-link {
+    @apply text-xs text-ink-muted no-underline cursor-pointer;
+    transition: color 0.2s;
+  }
+
+  .settings-link:hover {
+    @apply text-warm underline;
+    text-underline-offset: 3px;
+  }
+
+  /* Nuclear Toast */
+  .nuclear-toast {
+    @apply w-full mt-2 p-3 bg-card border border-border rounded-lg text-center;
+    animation: toast-fade-in 0.3s ease;
+  }
+
+  .nuclear-toast p {
+    @apply m-0 mb-1 text-sm text-ink;
+  }
+
+  .nuclear-toast .toast-donate {
+    @apply text-xs text-ink-muted;
+  }
+
+  .nuclear-toast .toast-link {
+    @apply inline-block mt-1.5 text-xs text-warm underline;
+  }
+}
+
+@keyframes toast-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Dark Mode ────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #1a1918;
+    --color-card: #242321;
+    --color-ink: #e6e2dd;
+    --color-ink-secondary: #a8a49e;
+    --color-ink-muted: #6b6863;
+    --color-border: #363430;
+    --color-warm: #c59d75;
+    --color-warm-hover: #b8905a;
+  }
+}

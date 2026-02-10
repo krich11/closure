@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Closure</title>
+  <link rel="stylesheet" href="onboarding.css">
+</head>
+<body>
+  <div class="onboarding-container">
+
+    <!-- Step 1: Welcome -->
+    <section id="step-welcome" class="step step--active" aria-labelledby="welcome-heading">
+      <div class="step-icon" aria-hidden="true">
+        <img src="../icons/icon-128.png" alt="" class="welcome-logo">
+      </div>
+      <h1 id="welcome-heading" class="step-title">Welcome to Closure</h1>
+      <p class="step-body">
+        Your browser remembers everything you meant to read, every rabbit hole you fell into, 
+        every tab you kept <em>"just in case."</em>
+      </p>
+      <p class="step-body">
+        Closure is a <strong>digital archivist</strong> that tidies your tabs, 
+        preserves what matters, and gives you permission to let go.
+      </p>
+      <p class="step-body step-body--quiet">
+        Nothing ever leaves your device. No servers. No tracking. Just you and your browser.
+      </p>
+      <button class="btn btn-primary" data-next="step-permissions" type="button">
+        Let's Set Things Up
+      </button>
+    </section>
+
+    <!-- Step 2: Permissions Explained -->
+    <section id="step-permissions" class="step" aria-labelledby="permissions-heading" hidden>
+      <h2 id="permissions-heading" class="step-title">What Closure Needs (and Why)</h2>
+      <p class="step-body">
+        Every permission has a purpose. Here's exactly why each one is requested:
+      </p>
+
+      <ul class="permission-list">
+        <li class="permission-item">
+          <div class="permission-icon" aria-hidden="true">&#128196;</div>
+          <div class="permission-detail">
+            <strong>Tabs</strong>
+            <span>Read tab titles, URLs, and idle times to detect which tabs need attention.</span>
+          </div>
+        </li>
+        <li class="permission-item">
+          <div class="permission-icon" aria-hidden="true">&#128193;</div>
+          <div class="permission-detail">
+            <strong>Tab Groups</strong>
+            <span>Automatically group related tabs by domain and collapse old groups.</span>
+          </div>
+        </li>
+        <li class="permission-item">
+          <div class="permission-icon" aria-hidden="true">&#128190;</div>
+          <div class="permission-detail">
+            <strong>Storage</strong>
+            <span>Save your settings, archived tab summaries, and stats locally on your machine.</span>
+          </div>
+        </li>
+        <li class="permission-item">
+          <div class="permission-icon" aria-hidden="true">&#9200;</div>
+          <div class="permission-detail">
+            <strong>Alarms</strong>
+            <span>Schedule periodic checks for idle tabs and broken pages — nothing runs unless needed.</span>
+          </div>
+        </li>
+        <li class="permission-item">
+          <div class="permission-icon" aria-hidden="true">&#128276;</div>
+          <div class="permission-detail">
+            <strong>Notifications</strong>
+            <span>Let you know when tabs are archived so nothing feels lost.</span>
+          </div>
+        </li>
+        <li class="permission-item">
+          <div class="permission-icon" aria-hidden="true">&#128270;</div>
+          <div class="permission-detail">
+            <strong>Scripting</strong>
+            <span>Extract page content for AI summaries and show the "Stay of Execution" overlay before archiving.</span>
+          </div>
+        </li>
+      </ul>
+
+      <div class="step-nav">
+        <button class="btn btn-ghost" data-prev="step-welcome" type="button">Back</button>
+        <button class="btn btn-primary" data-next="step-features" type="button">Got It</button>
+      </div>
+    </section>
+
+    <!-- Step 3: Feature Tour -->
+    <section id="step-features" class="step" aria-labelledby="features-heading" hidden>
+      <h2 id="features-heading" class="step-title">What Happens Next</h2>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3 class="feature-name">Clean Slate</h3>
+          <p class="feature-desc">Tabs from the same site are grouped together automatically. Your tab bar stays organized.</p>
+        </div>
+        <div class="feature-card">
+          <h3 class="feature-name">Dead End Sweeper</h3>
+          <p class="feature-desc">Broken pages (404s, errors, timeouts) are quietly cleaned up every hour.</p>
+        </div>
+        <div class="feature-card">
+          <h3 class="feature-name">Graceful Exit</h3>
+          <p class="feature-desc">Idle tabs are summarized by on-device AI and archived to your Sunday Digest.</p>
+        </div>
+        <div class="feature-card">
+          <h3 class="feature-name">Sunday Digest</h3>
+          <p class="feature-desc">A beautiful magazine-style dashboard of everything you saved. Restore any tab with one click.</p>
+        </div>
+      </div>
+
+      <div class="safety-note">
+        <p><strong>Safety net:</strong> Pinned tabs and tabs playing audio are <em>never</em> touched. 
+        You can whitelist any domain in Settings.</p>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn-ghost" data-prev="step-permissions" type="button">Back</button>
+        <button class="btn btn-primary" data-next="step-ready" type="button">I'm Ready</button>
+      </div>
+    </section>
+
+    <!-- Step 4: Ready -->
+    <section id="step-ready" class="step" aria-labelledby="ready-heading" hidden>
+      <div class="step-icon" aria-hidden="true">&#10024;</div>
+      <h2 id="ready-heading" class="step-title">You're All Set</h2>
+      <p class="step-body">
+        Closure is now running quietly in the background. Click the extension icon anytime 
+        to see your browser health and archive idle tabs.
+      </p>
+      <p class="step-body step-body--quiet">
+        Nothing is lost. Everything is remembered.
+      </p>
+      <button id="close-onboarding" class="btn btn-primary" type="button">
+        Start Using Closure
+      </button>
+    </section>
+
+    <!-- Progress Dots -->
+    <nav class="step-dots" aria-label="Onboarding progress">
+      <span class="dot dot--active" data-step="step-welcome" aria-label="Step 1 of 4"></span>
+      <span class="dot" data-step="step-permissions" aria-label="Step 2 of 4"></span>
+      <span class="dot" data-step="step-features" aria-label="Step 3 of 4"></span>
+      <span class="dot" data-step="step-ready" aria-label="Step 4 of 4"></span>
+    </nav>
+
+  </div>
+
+  <script src="onboarding.js"></script>
+</body>
+</html>

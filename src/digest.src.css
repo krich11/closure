@@ -1,0 +1,277 @@
+@import "../src/shared.css";
+
+/* ─── Digest-specific styles (Magazine / Editorial) ────────────── */
+@layer components {
+  /* Layout */
+  .digest-container {
+    @apply max-w-[900px] mx-auto;
+    padding: 2.5rem 1.5rem;
+  }
+
+  /* ── Masthead ─────────────────────────────────────────────────── */
+  .masthead {
+    @apply text-center pb-10 mb-10;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .masthead-brand {
+    @apply flex flex-col items-center gap-2;
+  }
+
+  .masthead-logo {
+    @apply w-12 h-12 opacity-80;
+  }
+
+  .masthead h1 {
+    @apply font-serif font-bold text-4xl tracking-tight m-0;
+    letter-spacing: -0.02em;
+  }
+
+  .masthead-date {
+    @apply font-serif italic text-ink-secondary mt-2 text-lg;
+  }
+
+  /* ── Lead Story ───────────────────────────────────────────────── */
+  .lead-story {
+    @apply text-center mb-16;
+  }
+
+  .headline {
+    @apply font-serif text-3xl font-normal mb-2;
+  }
+
+  .subhead {
+    @apply text-ink-secondary text-lg mb-10 max-w-xl mx-auto;
+  }
+
+  .stats-grid {
+    @apply grid grid-cols-3 gap-6 max-w-2xl mx-auto;
+  }
+
+  .stat-card {
+    @apply flex flex-col items-center p-6 bg-card rounded-lg;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  }
+
+  .stat-number {
+    @apply font-serif text-3xl font-bold text-warm;
+  }
+
+  .stat-label {
+    @apply text-xs uppercase tracking-widest text-ink-muted mt-2;
+  }
+
+  /* ── Actions Bar ──────────────────────────────────────────────── */
+  .actions-bar {
+    @apply flex justify-between items-center mb-10;
+  }
+
+  .filter-controls {
+    @apply text-sm text-ink-secondary;
+  }
+
+  .filter-controls select {
+    @apply ml-2 py-1 px-2 bg-card rounded text-ink;
+    border: 1px solid var(--color-border);
+    font-family: var(--font-sans);
+  }
+
+  /* ── Feed & Cards ─────────────────────────────────────────────── */
+  .archive-feed {
+    @apply flex flex-col gap-6;
+    container-type: inline-size;
+  }
+
+  .archive-group {
+    @apply mb-10;
+  }
+
+  .group-header {
+    @apply flex justify-between items-baseline mb-6 pb-2;
+    border-bottom: 2px solid var(--color-border);
+  }
+
+  .group-title {
+    @apply font-serif text-2xl m-0;
+  }
+
+  .group-actions button {
+    @apply text-sm text-warm cursor-pointer p-0 bg-transparent border-none underline;
+    text-underline-offset: 3px;
+  }
+
+  .group-actions button:hover {
+    @apply text-ink;
+  }
+
+  /* ── Archive Card ─────────────────────────────────────────────── */
+  .archive-card {
+    @apply bg-card rounded-lg p-6;
+    border: 1px solid var(--color-border);
+    display: grid;
+    grid-template-areas:
+      "icon content"
+      "icon footer";
+    grid-template-columns: 40px 1fr;
+    gap: 1.25rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .archive-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border-color: var(--color-warm);
+  }
+
+  .card-favicon {
+    grid-area: icon;
+    @apply w-10 h-10 rounded object-contain;
+  }
+
+  .card-content {
+    grid-area: content;
+  }
+
+  .card-title {
+    @apply font-serif text-xl m-0 mb-2 leading-snug;
+  }
+
+  .card-title a {
+    @apply text-ink no-underline;
+  }
+
+  .card-title a:hover {
+    @apply underline;
+    text-decoration-color: var(--color-warm);
+  }
+
+  .card-summary {
+    @apply text-ink-secondary text-base;
+  }
+
+  .card-summary ul {
+    @apply m-0 pl-5;
+  }
+
+  .card-summary li {
+    @apply mb-1;
+  }
+
+  .card-summary p {
+    @apply m-0;
+  }
+
+  .card-footer {
+    grid-area: footer;
+    @apply flex justify-between items-center mt-2 text-sm text-ink-muted;
+  }
+
+  .restore-btn {
+    @apply bg-transparent py-1 px-2 rounded cursor-pointer text-ink-secondary;
+    border: 1px solid var(--color-border);
+    transition: all 0.2s;
+  }
+
+  .restore-btn:hover {
+    @apply bg-warm text-white;
+    border-color: var(--color-warm);
+  }
+
+  /* ── Empty State ──────────────────────────────────────────────── */
+  .empty-state {
+    @apply text-center py-16 text-ink-muted italic font-serif text-xl bg-card rounded-lg;
+    border: 1px dashed var(--color-border);
+  }
+
+  /* ── Buttons ──────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-block py-2.5 px-5 rounded font-medium no-underline cursor-pointer text-base font-sans border-none;
+    transition: opacity 0.2s;
+  }
+
+  .btn:hover {
+    @apply opacity-90;
+  }
+
+  .btn-primary {
+    @apply bg-warm text-white;
+  }
+
+  .btn-secondary {
+    @apply bg-card text-ink-secondary;
+    border: 1px solid var(--color-border);
+  }
+
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  /* ── Footer / Donation (Gratitude) ────────────────────────────── */
+  .digest-footer {
+    @apply mt-16 pt-10 text-center;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .donation-prompt {
+    @apply p-10 rounded-2xl max-w-xl mx-auto;
+    background-color: color-mix(in srgb, var(--color-paper) 95%, var(--color-warm));
+  }
+
+  .donation-text {
+    @apply font-serif text-xl mb-2;
+  }
+
+  .donation-tagline {
+    @apply font-serif text-base text-ink-secondary mb-4 italic;
+  }
+
+  .privacy-note {
+    @apply text-sm text-ink-muted mb-6;
+  }
+
+  .donation-hearts {
+    @apply text-2xl mb-4;
+    letter-spacing: 0.3em;
+  }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .stats-grid {
+    @apply grid-cols-1 gap-3;
+  }
+
+  .actions-bar {
+    @apply flex-col gap-3 items-start;
+  }
+
+  .archive-card {
+    grid-template-areas:
+      "content"
+      "footer";
+    grid-template-columns: 1fr;
+  }
+
+  .card-favicon {
+    display: none;
+  }
+}
+
+/* ── Dark Mode ───────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #1a1918;
+    --color-card: #242321;
+    --color-ink: #e6e2dd;
+    --color-ink-secondary: #a8a49e;
+    --color-ink-muted: #6b6863;
+    --color-border: #363430;
+    --color-warm: #c59d75;
+    --color-warm-hover: #b8905a;
+  }
+
+  .donation-prompt {
+    background-color: #242321;
+  }
+}
