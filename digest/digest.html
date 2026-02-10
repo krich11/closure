@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunday Digest — Closure</title>
+  <link rel="stylesheet" href="digest.css">
+</head>
+<body>
+  <div class="layout-container">
+    <header class="masthead">
+      <div class="masthead-brand">
+        <img src="../icons/icon-48.png" alt="Closure Icon" class="logo">
+        <h1>Sunday Digest</h1>
+      </div>
+      <p class="masthead-date" id="digest-date">February 9, 2026</p>
+    </header>
+
+    <main>
+      <!-- Intro / Stats Section -->
+      <section class="lead-story">
+        <h2 class="headline">The Art of Letting Go</h2>
+        <p class="subhead">You curated your attention this week. Here is what you saved for later.</p>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-number" id="total-archived">0</span>
+            <span class="stat-label">Tabs Archived</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="ram-saved">0 MB</span>
+            <span class="stat-label">RAM Reclaimed</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="topics-explored">0</span>
+            <span class="stat-label">Topics Explored</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Action Bar -->
+      <div class="actions-bar">
+        <button id="cluster-btn" class="btn btn-secondary" disabled>
+          <span class="icon">✨</span> Cluster by Theme
+        </button>
+        <div class="filter-controls">
+          <label for="sort-select">Sort by:</label>
+          <select id="sort-select">
+            <option value="recency">Recency</option>
+            <option value="domain">Domain</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Main Content: Archived Items -->
+      <div class="archive-feed" id="archive-feed">
+        <!-- Content injected by digest.js -->
+        <div class="empty-state">
+          <p>Your mind is clear. No tabs were archived this week.</p>
+        </div>
+      </div>
+    </main>
+
+    <footer class="digest-footer">
+      <div class="donation-prompt">
+        <p class="donation-text">You explored <span id="footer-topics-count">0</span> topics this week. Your browser stayed clean.</p>
+        <p class="privacy-note">This runs 100% locally. Support the code that keeps your privacy safe.</p>
+        <a href="https://buymeacoffee.com/closure" target="_blank" class="btn btn-primary" rel="noopener noreferrer">
+          Buy the Dev a Coffee
+        </a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="digest.js"></script>
+</body>
+</html>
