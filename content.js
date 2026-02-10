@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Content Script (content.js)
- * @version 1.1.0
+ * @version 1.2.0
  *
  * Injected on-demand via chrome.scripting.executeScript.
  * Handles multiple actions based on the injection context:
