@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.7.1
+ * @version 1.7.2
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -184,8 +184,12 @@ const MULTI_PART_TLDS = new Set([
  */
 function getRegistrableDomain(hostname) {
   const host = hostname.replace(/^www\./, '');
-  const parts = host.split('.');
 
+  // IP addresses (v4) should be returned as-is — not split into TLD parts
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) return host;
+
+  // localhost or single-label hosts
+  const parts = host.split('.');
   if (parts.length <= 2) return host;
 
   // Check if the last two segments form a known multi-part TLD
