@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.7.2
+ * @version 1.8.0
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -676,10 +676,12 @@ async function runDeadEndSweep() {
 
       const domain = getRootDomain(tab.url);
 
-      // Skip non-http tabs (chrome://, about:, etc.) unless stuck
+      // Non-http tabs: sweep blank/new tabs, check stuck for others
       if (!domain) {
-        // Check if it's a stuck loading tab (no URL for > 1 hour)
-        if (await isTabStuck(tab)) {
+        if (isBlankTab(tab)) {
+          await sweepTab(tab, 'Blank/new tab');
+          sweptTabs.push(tab);
+        } else if (await isTabStuck(tab)) {
           await sweepTab(tab, 'Stuck loading (no URL, > 1 hour)');
           sweptTabs.push(tab);
         }
@@ -764,19 +766,48 @@ function checkTitleForErrors(title) {
 /**
  * Check whether a tab has been stuck in 'loading' state for too long.
  *
- * Uses a heuristic: if the tab's status is not 'complete' and its
- * lastAccessed time is older than the threshold, it's considered stuck.
+ * Only considers tabs actively in the 'loading' state. Tabs with status
+ * 'unloaded' are simply discarded by Chrome to save memory — they are
+ * perfectly valid and will reload when the user clicks them. Sweeping
+ * discarded tabs would destroy valid browsing sessions.
  *
  * @param {chrome.tabs.Tab} tab
  * @returns {Promise<boolean>}
  */
 async function isTabStuck(tab) {
-  if (tab.status === 'complete') return false;
+  // Only actively-loading tabs can be "stuck"
+  // 'complete' = loaded fine, 'unloaded' = Chrome discarded to save RAM
+  if (tab.status !== 'loading') return false;
+
+  // Belt-and-suspenders: Chrome marks discarded tabs explicitly
+  if (tab.discarded) return false;
 
   // lastAccessed is available on chrome.tabs.Tab
   const lastAccessed = tab.lastAccessed || Date.now();
   const elapsed = Date.now() - lastAccessed;
   return elapsed > STUCK_TAB_THRESHOLD_MS;
+}
+
+/**
+ * Check whether a tab is a blank or new-tab page — non-functional tabs
+ * that clutter the tab strip without providing value.
+ *
+ * @param {chrome.tabs.Tab} tab
+ * @returns {boolean}
+ */
+function isBlankTab(tab) {
+  const url = (tab.url || '').toLowerCase();
+  const blankUrls = [
+    'chrome://newtab',
+    'chrome://newtab/',
+    'chrome://new-tab-page',
+    'chrome://new-tab-page/',
+    'about:blank',
+    'about:newtab',
+    'edge://newtab',
+    'edge://newtab/',
+  ];
+  return !url || blankUrls.includes(url);
 }
 
 // contentScriptDetectError removed — detection now uses title patterns + stuck heuristic only
@@ -916,7 +947,7 @@ async function summarizeTab(tab) {
     }
   }
 
-  const prompt = `Summarize this page in 3 bullet points (total under 100 words), preserving key facts, numbers, dates, action items, and the user's likely intent for visiting.\n\n${pageContext}`;
+  const prompt = `Describe this page in one short phrase (under 12 words). State what the page is about, not specific details.\n\n${pageContext}`;
 
   const aiResult = await promptAi(prompt);
   if (aiResult) {
@@ -1290,6 +1321,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }).catch((err) => {
       console.error('[Closure:TopicGroup] Manual trigger error:', err);
       sendResponse({ ok: false });
+    });
+    return true;
+  }
+
+  if (message.action === 'runSweep') {
+    runDeadEndSweep().then(() => {
+      chrome.storage.local.get('swept').then(({ swept }) => {
+        sendResponse({ count: (swept || []).length });
+      });
+    }).catch((err) => {
+      console.error('[Closure] Manual sweep error:', err);
+      sendResponse({ count: 0 });
+    });
+    return true;
+  }
+
+  if (message.action === 'resummarize') {
+    const { url, title } = message;
+    const pageContext = `Title: ${title || 'Untitled'}\nURL: ${url || ''}`;
+    const prompt = `Describe this page in one short phrase (under 12 words). State what the page is about, not specific details.\n\n${pageContext}`;
+    promptAi(prompt).then((result) => {
+      sendResponse({ ok: !!result, summary: result || title || 'Untitled' });
+    }).catch(() => {
+      sendResponse({ ok: false, summary: title || 'Untitled' });
     });
     return true;
   }

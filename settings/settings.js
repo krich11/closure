@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.7.2
+ * @version 1.8.0
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   bindToggle('enable-clustering', cfg.enableThematicClustering ?? false);
   bindToggle('high-contrast', cfg.highContrastMode ?? false);
+  bindToggle('enable-debug', cfg.enableDebugTools ?? false);
 
   // Archive sort preference
   bindSelect('archive-sort', cfg.archiveSortBy ?? 'recency');
@@ -233,6 +234,7 @@ async function saveConfig() {
     topicGroupingIntervalMinutes: parseInt(document.getElementById('topic-grouping-interval')?.value, 10) || 120,
     topicGroupingOvernightOnly: document.getElementById('topic-grouping-overnight')?.getAttribute('aria-checked') === 'true',
     highContrastMode: document.getElementById('high-contrast')?.getAttribute('aria-checked') === 'true',
+    enableDebugTools: document.getElementById('enable-debug')?.getAttribute('aria-checked') === 'true',
     whitelist: getWhitelistFromDOM(),
   };
 

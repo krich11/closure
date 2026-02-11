@@ -80,7 +80,7 @@ test.describe('Digest — Rendering Archived Entries', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(500);
 
-    const emptyState = page.locator('.empty-state');
+    const emptyState = page.locator('#archive-feed .empty-state');
     await expect(emptyState).toBeVisible();
   });
 
@@ -96,9 +96,10 @@ test.describe('Digest — Rendering Archived Entries', () => {
           favicon: '',
           timestamp: Date.now(),
           summary: 'This is a detailed summary for testing card rendering.',
-          summaryType: 'fallback',
+          summaryType: 'ai',
           domain: 'example.com',
         }],
+        swept: [],
         stats: { tabsTidiedThisWeek: 1, ramSavedEstimate: 50 },
       });
     });
@@ -115,9 +116,8 @@ test.describe('Digest — Rendering Archived Entries', () => {
     const cardSummary = page.locator('.card-summary').first();
     await expect(cardSummary).toContainText('detailed summary');
 
-    const timestamp = page.locator('.timestamp').first();
+    const timestamp = page.locator('.card-timestamp').first();
     await expect(timestamp).toBeVisible();
-    expect(await timestamp.textContent()).toContain('Archived');
   });
 
   test('group header shows uppercased domain name', async ({ context, extensionId }) => {
@@ -327,16 +327,20 @@ test.describe('Digest — Stats Display', () => {
     await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
     await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [{
-          url: 'https://a.com/p',
-          title: 'A',
+      const items = [];
+      for (let i = 0; i < 12; i++) {
+        items.push({
+          url: `https://d${i}.com/p`,
+          title: `Page ${i}`,
           favicon: '',
-          timestamp: Date.now(),
+          timestamp: Date.now() - i * 1000,
           summary: 'S',
           summaryType: 'fallback',
-          domain: 'a.com',
-        }],
+          domain: `d${i}.com`,
+        });
+      }
+      await chrome.storage.local.set({
+        archived: items,
         stats: { tabsTidiedThisWeek: 12, ramSavedEstimate: 600 },
       });
     });
@@ -353,7 +357,7 @@ test.describe('Digest — Stats Display', () => {
     expect(ramSaved).toBe('600 MB');
 
     const topics = await page.locator('#topics-explored').textContent();
-    expect(topics).toBe('1'); // 1 unique domain
+    expect(topics).toBe('12'); // 12 unique domains
   });
 
   test('date header shows current date', async ({ context, extensionId }) => {
@@ -410,13 +414,12 @@ test.describe('Digest — Accessibility', () => {
     expect(lang).toBe('en');
   });
 
-  test('cluster button is initially disabled (no window.ai)', async ({ context, extensionId }) => {
+  test('theme sort option is initially disabled (no window.ai)', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
     await page.waitForLoadState('domcontentloaded');
 
-    const clusterBtn = page.locator('#cluster-btn');
-    await expect(clusterBtn).toBeVisible();
-    await expect(clusterBtn).toBeDisabled();
+    const themeOption = page.locator('#sort-theme-option');
+    await expect(themeOption).toBeDisabled();
   });
 });

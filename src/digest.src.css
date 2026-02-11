@@ -45,11 +45,11 @@
   }
 
   .stats-grid {
-    @apply grid grid-cols-3 gap-6 max-w-2xl mx-auto;
+    @apply grid grid-cols-4 gap-6 max-w-3xl mx-auto;
   }
 
   .stat-card {
-    @apply flex flex-col items-center p-6 bg-card rounded-lg;
+    @apply flex flex-col items-center p-5 bg-card rounded-lg;
     border: 1px solid var(--color-border);
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
   }
@@ -60,6 +60,25 @@
 
   .stat-label {
     @apply text-xs uppercase tracking-widest text-ink-muted mt-2;
+  }
+
+  /* Stat card action buttons */
+  .btn-stat-action {
+    @apply mt-3 py-1.5 px-4 rounded text-xs font-medium cursor-pointer;
+    background: transparent;
+    color: var(--color-warm);
+    border: 1px solid var(--color-border);
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .btn-stat-action:hover {
+    border-color: var(--color-warm);
+    background-color: var(--color-warm);
+    color: var(--color-white);
+  }
+
+  .btn-stat-action:disabled {
+    @apply opacity-60 cursor-not-allowed;
   }
 
   /* ── Actions Bar ──────────────────────────────────────────────── */
@@ -149,12 +168,13 @@
   }
 
   .card-title {
-    @apply text-sm font-medium m-0 leading-snug truncate;
+    @apply text-sm font-medium m-0 leading-snug flex items-center gap-1.5;
     font-family: var(--font-sans);
+    min-width: 0;
   }
 
   .card-title a {
-    @apply text-ink no-underline;
+    @apply text-ink no-underline truncate;
   }
 
   .card-title a:hover {
@@ -193,6 +213,50 @@
   .restore-btn:hover {
     @apply bg-warm text-white;
     border-color: var(--color-warm);
+  }
+
+  .resummarize-btn {
+    @apply bg-transparent py-0.5 px-2 rounded cursor-pointer text-ink-muted text-xs;
+    border: 1px solid var(--color-border);
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .resummarize-btn:hover {
+    border-color: var(--color-warm);
+    color: var(--color-warm);
+  }
+
+  .resummarize-btn:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  /* ── Card Badges ──────────────────────────────────────────────── */
+  .card-badge {
+    @apply text-[10px] font-semibold uppercase tracking-wide py-0 px-1.5 rounded-sm;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .card-badge--swept {
+    color: var(--color-red);
+    background: color-mix(in srgb, var(--color-red) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-red) 25%, transparent);
+  }
+
+  /* ── Swept Card Variant ───────────────────────────────────────── */
+  .archive-card--swept {
+    opacity: 0.75;
+    border-style: dashed;
+  }
+
+  .archive-card--swept:hover {
+    opacity: 1;
+  }
+
+  /* ── Timestamp ────────────────────────────────────────────────── */
+  .card-timestamp {
+    white-space: nowrap;
   }
 
   /* ── Empty State ──────────────────────────────────────────────── */

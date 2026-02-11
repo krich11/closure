@@ -212,6 +212,22 @@
         <button id="clear-storage-btn" class="btn btn-small btn-outline" type="button">Clear Storage…</button>
       </section>
 
+      <!-- Debug -->
+      <section class="settings-section" aria-labelledby="section-debug">
+        <h2 id="section-debug" class="section-title">Debug</h2>
+        <p class="section-desc">Developer tools for testing and troubleshooting. These add extra buttons and controls to Closure’s UI that are not shown to regular users.</p>
+
+        <div class="field field-toggle">
+          <label for="enable-debug" class="field-label">
+            Enable debug tools
+            <span class="field-hint">Shows a Re-summarize button on each archived card in Memory Lane, and other diagnostic controls</span>
+          </label>
+          <button id="enable-debug" class="toggle" role="switch" aria-checked="false" type="button">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </button>
+        </div>
+      </section>
+
       <!-- Clear Storage Dialog -->
       <dialog id="clear-storage-dialog" class="storage-dialog" aria-labelledby="dialog-title">
         <div class="dialog-content">
@@ -265,7 +281,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.7.2 — 100% local, 100% private.</p>
+      <p>Closure v1.8.0 — 100% local, 100% private.</p>
     </footer>
   </div>
 

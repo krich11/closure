@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Memory Lane (digest.js)
- * @version 1.7.2
+ * @version 1.8.0
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSortControl();
   setupSearchFilter();
   setupExportButtons();
+  setupActionButtons();
 });
 
 // Update the masthead date to today or "Sunday, Month Day"
@@ -42,10 +43,16 @@ async function loadSortPreference() {
 }
 
 async function loadAndRenderContent() {
-  const { archived, stats, config } = await chrome.storage.local.get(['archived', 'stats', 'config']);
-  
-  // Render Stats
-  document.getElementById('total-archived').textContent = stats?.tabsTidiedThisWeek || 0;
+  const { archived, swept, stats, config } = await chrome.storage.local.get(['archived', 'swept', 'stats', 'config']);
+
+  // Check if debug tools are enabled (controls re-summarize button visibility)
+  createCard._debugEnabled = config?.enableDebugTools ?? false;
+
+  // Render Stats — use actual array lengths, not running counters
+  const archivedList = archived || [];
+  const sweptList = swept || [];
+  document.getElementById('total-archived').textContent = archivedList.length;
+  document.getElementById('total-swept').textContent = sweptList.length;
   
   const savedMb = stats?.ramSavedEstimate || 0;
   document.getElementById('ram-saved').textContent = savedMb >= 1024 
@@ -53,14 +60,25 @@ async function loadAndRenderContent() {
     : `${Math.round(savedMb)} MB`;
 
   // Provide simple topic count estimate (unique domains)
-  const domains = new Set((archived || []).map(item => item.domain));
+  const domains = new Set(archivedList.map(item => item.domain));
   const uniqueTopics = domains.size;
   document.getElementById('topics-explored').textContent = uniqueTopics;
   document.getElementById('footer-topics-count').textContent = uniqueTopics;
 
+  // Merge archived and swept into a unified feed
+  // Tag each item with its source type so createCard can differentiate
+  const allItems = [
+    ...archivedList.map(item => ({ ...item, _type: 'archived' })),
+    ...sweptList.map(item => ({
+      ...item,
+      _type: 'swept',
+      domain: domainFromUrl(item.url),
+    })),
+  ];
+
   // Render Feed
   const feedEl = document.getElementById('archive-feed');
-  if (!archived || archived.length === 0) {
+  if (allItems.length === 0) {
     return; // Leave empty state visible
   }
 
@@ -69,7 +87,7 @@ async function loadAndRenderContent() {
   
   // Group by Domain (default)
   const sortMode = document.getElementById('sort-select')?.value || 'recency';
-  const groups = groupBy(archived, 'domain');
+  const groups = groupBy(allItems, 'domain');
   
   // Sort domains: by most recent entry timestamp (recency) or alphabetically
   const sortedDomains = Object.keys(groups).sort((a, b) => {
@@ -119,53 +137,130 @@ async function loadAndRenderContent() {
   setupEventListeners();
 }
 
+/**
+ * Extract a display domain from a URL (for swept items that lack a domain field).
+ */
+function domainFromUrl(url) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    // Return IP addresses as-is
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) return hostname;
+    const parts = hostname.split('.');
+    return parts.length <= 2 ? hostname : parts.slice(-2).join('.');
+  } catch {
+    return 'unknown';
+  }
+}
+
 function createCard(item) {
   const card = document.createElement('article');
   card.className = 'archive-card';
+  const isSwept = item._type === 'swept';
+  if (isSwept) card.classList.add('archive-card--swept');
   
   // Safe Fallbacks
   const title = item.title || 'Untitled Page';
+  const safeTitle = title.replace(/"/g, '&quot;');
   const url = item.url || '#';
   const archiveDate = new Date(item.timestamp);
   const displayDate = archiveDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
   const displayTime = archiveDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
-  // Summary Handling
+  // Summary — only for archived tabs with AI summaries
   let summaryHtml = '';
-  if (item.summary) {
-    if (item.summaryType === 'ai') {
-      summaryHtml = `<div class="card-summary">${formatSummary(item.summary)}</div>`;
-    } else {
-      // Fallback summary — show a truncated snippet
-      const snippet = item.summary.substring(0, 200);
-      summaryHtml = `<div class="card-summary"><p>${snippet}</p></div>`;
-    }
+  if (!isSwept && item.summary && item.summaryType === 'ai') {
+    summaryHtml = `<div class="card-summary">${formatSummary(item.summary)}</div>`;
   }
+
+  // Re-summarize button — only visible when debug tools are enabled
+  // Uses timestamp as unique key since multiple entries can share the same URL
+  const showDebug = createCard._debugEnabled;
+  const resummarizeHtml = (!isSwept && showDebug)
+    ? `<button class="resummarize-btn" data-url="${url}" data-title="${safeTitle}" data-ts="${item.timestamp}">Re-summarize</button>`
+    : '';
+
+  // Type badge — swept tabs show the reason
+  const typeBadge = isSwept
+    ? `<span class="card-badge card-badge--swept" title="${item.reason || 'Error detected'}">Swept</span>`
+    : '';
   
   card.innerHTML = `
-    <img src="${item.favicon || '../icons/icon-48.png'}" alt="" class="card-favicon" onerror="this.src='../icons/icon-48.png'">
+    <img src="${item.favicon || '../icons/icon-48.png'}" alt="" class="card-favicon">
     <div class="card-content">
       <h4 class="card-title">
         <a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>
+        ${typeBadge}
       </h4>
       ${summaryHtml}
     </div>
     <div class="card-footer">
-      <span class="timestamp">Archived ${displayDate} at ${displayTime}</span>
-      <button class="restore-btn" data-url="${url}">Restore Tab</button>
+      <span class="card-timestamp">${displayDate}, ${displayTime}</span>
+      ${resummarizeHtml}
+      <button class="restore-btn" data-url="${url}">Restore</button>
     </div>
   `;
+
+  // Favicon fallback — can't use inline onerror (CSP violation in MV3)
+  const img = card.querySelector('.card-favicon');
+  img.addEventListener('error', () => { img.src = '../icons/icon-48.png'; }, { once: true });
 
   return card;
 }
 
 function formatSummary(text) {
-  // Rudimentary bullet parsing if AI returns raw text with dashes
-  if (text.includes('\n-')) {
-    const items = text.split('\n-').filter(l => l.trim().length > 0).map(l => `<li>${l.replace(/^-/, '').trim()}</li>`).join('');
-    return `<ul>${items}</ul>`;
+  // Strip any bullet markers or line breaks — display as a single inline phrase
+  const clean = text.replace(/^[-•*]\s*/gm, '').replace(/\n+/g, ' ').trim();
+  return `<p>${clean}</p>`;
+}
+
+/**
+ * Handle a single re-summarize click independently.
+ * Runs as a detached async function so multiple clicks execute concurrently.
+ *
+ * @param {HTMLButtonElement} btn
+ */
+async function handleResummarize(btn) {
+  const url = btn.dataset.url;
+  const title = btn.dataset.title;
+  const ts = parseInt(btn.dataset.ts, 10);
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'resummarize', url, title });
+    if (response?.ok) {
+      // Update the card's summary display
+      const cardContent = btn.closest('.archive-card')?.querySelector('.card-content');
+      if (cardContent) {
+        let summaryEl = cardContent.querySelector('.card-summary');
+        if (!summaryEl) {
+          summaryEl = document.createElement('div');
+          summaryEl.className = 'card-summary';
+          cardContent.appendChild(summaryEl);
+        }
+        summaryEl.innerHTML = formatSummary(response.summary);
+      }
+      // Persist to storage — match by timestamp (unique per entry)
+      const { archived } = await chrome.storage.local.get('archived');
+      const entry = archived?.find(a => a.timestamp === ts);
+      if (entry) {
+        entry.summary = response.summary;
+        entry.summaryType = 'ai';
+        await chrome.storage.local.set({ archived });
+      }
+      btn.textContent = 'Done';
+    } else {
+      btn.textContent = 'No AI';
+    }
+  } catch (err) {
+    btn.textContent = 'Error';
+    console.error('[Closure] Re-summarize error:', err);
   }
-  return `<p>${text}</p>`;
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = 'Re-summarize';
+  }, 3000);
 }
 
 async function setupEventListeners() {
@@ -194,6 +289,10 @@ async function setupEventListeners() {
         e.target.textContent = 'All Restored';
         e.target.disabled = true;
       }
+    } else if (e.target.classList.contains('resummarize-btn')) {
+      // Fire-and-forget: each re-summarize runs independently so
+      // multiple buttons can be clicked concurrently
+      handleResummarize(e.target);
     }
   });
 
@@ -511,4 +610,73 @@ function downloadBlob(blob, filename) {
 function formatDateForFilename() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Wire up the Archive Now and Sweep Now buttons in the stats cards.
+ */
+function setupActionButtons() {
+  const archiveBtn = document.getElementById('archive-now');
+  if (archiveBtn) {
+    archiveBtn.addEventListener('click', async () => {
+      archiveBtn.disabled = true;
+      archiveBtn.textContent = 'Archiving…';
+
+      try {
+        const response = await chrome.runtime.sendMessage({ action: 'nuclearArchive' });
+        const count = response?.count || 0;
+
+        if (count === 0) {
+          archiveBtn.textContent = 'No idle tabs';
+        } else {
+          archiveBtn.textContent = `${count} archived`;
+          // Refresh the whole page to show newly archived tabs
+          await loadAndRenderContent();
+        }
+      } catch (err) {
+        archiveBtn.textContent = 'Error';
+        console.error('[Closure] Archive error:', err);
+      }
+
+      setTimeout(() => {
+        archiveBtn.disabled = false;
+        archiveBtn.textContent = 'Archive Now';
+      }, 3000);
+    });
+  }
+
+  const sweepBtn = document.getElementById('sweep-now');
+  if (sweepBtn) {
+    sweepBtn.addEventListener('click', async () => {
+      sweepBtn.disabled = true;
+      sweepBtn.textContent = 'Sweeping…';
+
+      try {
+        const before = await chrome.storage.local.get('swept');
+        const countBefore = (before.swept || []).length;
+
+        await chrome.runtime.sendMessage({ action: 'runSweep' });
+
+        const after = await chrome.storage.local.get('swept');
+        const countAfter = (after.swept || []).length;
+        const delta = countAfter - countBefore;
+
+        if (delta === 0) {
+          sweepBtn.textContent = 'All clear';
+        } else {
+          sweepBtn.textContent = `${delta} swept`;
+          // Refresh to show newly swept tabs in the feed
+          await loadAndRenderContent();
+        }
+      } catch (err) {
+        sweepBtn.textContent = 'Error';
+        console.error('[Closure] Sweep error:', err);
+      }
+
+      setTimeout(() => {
+        sweepBtn.disabled = false;
+        sweepBtn.textContent = 'Sweep Now';
+      }, 3000);
+    });
+  }
 }
