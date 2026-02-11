@@ -62,6 +62,65 @@
     @apply text-xs uppercase tracking-widest text-ink-muted mt-2;
   }
 
+  /* ── Topics Card (expandable) ─────────────────────────────────── */
+  .stat-card--topics {
+    position: relative;
+    transition: border-color 0.2s ease;
+  }
+
+  .stat-card--topics[aria-expanded="true"] {
+    border-color: var(--color-warm);
+  }
+
+  .stat-badge {
+    @apply text-[10px] font-semibold uppercase tracking-wide mt-1.5 py-0.5 px-2 rounded-sm;
+    white-space: nowrap;
+  }
+
+  .stat-badge--ai {
+    color: var(--color-green);
+    background: color-mix(in srgb, var(--color-green) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-green) 30%, transparent);
+  }
+
+  .stat-badge--fallback {
+    color: var(--color-ink-muted);
+    background: color-mix(in srgb, var(--color-ink-muted) 8%, transparent);
+    border: 1px solid var(--color-border);
+  }
+
+  .stat-badge--pending {
+    color: var(--color-yellow);
+    background: color-mix(in srgb, var(--color-yellow) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-yellow) 25%, transparent);
+    animation: pulse-badge 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .topic-list {
+    @apply mt-3 pt-3 text-left text-xs text-ink-secondary w-full;
+    border-top: 1px solid var(--color-border);
+    list-style: none;
+    padding: 0;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .topic-list li {
+    @apply py-0.5 px-1;
+    line-height: 1.6;
+  }
+
+  .topic-list li::before {
+    content: "›  ";
+    color: var(--color-warm);
+    font-weight: 600;
+  }
+
   /* Stat card action buttons */
   .btn-stat-action {
     @apply mt-3 py-1.5 px-4 rounded text-xs font-medium cursor-pointer;

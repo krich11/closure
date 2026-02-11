@@ -350,6 +350,9 @@ test.describe('Digest — Stats Display', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(500);
 
+    // Wait for async topic extraction to complete (badge appears)
+    await page.waitForSelector('#topics-badge:not([hidden])', { timeout: 3000 }).catch(() => {});
+
     const totalArchived = await page.locator('#total-archived').textContent();
     expect(totalArchived).toBe('12');
 
@@ -357,7 +360,11 @@ test.describe('Digest — Stats Display', () => {
     expect(ramSaved).toBe('600 MB');
 
     const topics = await page.locator('#topics-explored').textContent();
-    expect(topics).toBe('12'); // 12 unique domains
+    expect(topics).toBe('12'); // 12 unique domains (AI unavailable — fallback)
+
+    // Badge should show 'sites' fallback since AI is unavailable in tests
+    const badge = page.locator('#topics-badge');
+    await expect(badge).toContainText('sites');
   });
 
   test('date header shows current date', async ({ context, extensionId }) => {
@@ -390,8 +397,11 @@ test.describe('Digest — Stats Display', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(500);
 
+    // Wait for async topic extraction to complete
+    await page.waitForSelector('#topics-badge:not([hidden])', { timeout: 3000 }).catch(() => {});
+
     const footerCount = await page.locator('#footer-topics-count').textContent();
-    expect(footerCount).toBe('3'); // 3 unique domains
+    expect(footerCount).toBe('3'); // 3 unique domains (AI unavailable — fallback)
   });
 });
 

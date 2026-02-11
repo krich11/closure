@@ -37,9 +37,11 @@
             <span class="stat-number" id="ram-saved">0 MB</span>
             <span class="stat-label">RAM Reclaimed</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-number" id="topics-explored">0</span>
+          <div class="stat-card stat-card--topics" id="topics-card">
+            <span class="stat-number" id="topics-explored">—</span>
             <span class="stat-label">Topics Explored</span>
+            <span class="stat-badge" id="topics-badge" hidden></span>
+            <ul class="topic-list" id="topic-list" hidden aria-label="Detected topics"></ul>
           </div>
         </div>
       </section>
@@ -88,7 +90,7 @@
         <p class="donation-hearts" aria-hidden="true">&#9829; &#9829; &#9829;</p>
         <p class="donation-text">
           You explored <strong id="footer-topics-count">0</strong> topics this week.
-          Your browser stayed clean.
+          Your browser stayed clean. <span id="footer-ai-note"></span>
         </p>
         <p class="donation-tagline">Every tab you let go is a small act of trust in your future self.</p>
         <p class="privacy-note">

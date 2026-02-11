@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Memory Lane (digest.js)
- * @version 1.8.0
+ * @version 1.8.1
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -59,11 +59,15 @@ async function loadAndRenderContent() {
     ? `${(savedMb/1024).toFixed(1)} GB` 
     : `${Math.round(savedMb)} MB`;
 
-  // Provide simple topic count estimate (unique domains)
+  // Topics Explored — show placeholder while AI processes
+  // Immediate fallback: unique domain count (replaced by AI if available)
   const domains = new Set(archivedList.map(item => item.domain));
-  const uniqueTopics = domains.size;
-  document.getElementById('topics-explored').textContent = uniqueTopics;
-  document.getElementById('footer-topics-count').textContent = uniqueTopics;
+  const domainCount = domains.size;
+  document.getElementById('topics-explored').textContent = domainCount || '\u2014';
+  document.getElementById('footer-topics-count').textContent = domainCount;
+
+  // Kick off AI topic extraction asynchronously (non-blocking)
+  extractTopicsWithAi(archivedList);
 
   // Merge archived and swept into a unified feed
   // Tag each item with its source type so createCard can differentiate
@@ -393,6 +397,170 @@ async function createAiSession() {
     return await window.ai.languageModel.create();
   }
   throw new Error('AI not available');
+}
+
+/**
+ * Use on-device AI to identify distinct topics from archived tab summaries/titles.
+ * Caches the result keyed by a hash of the archived URLs+timestamps so it doesn't
+ * re-prompt on every page load. Falls back to domain count with a visual indicator.
+ *
+ * @param {Array} archivedList — the full archived[] array from storage
+ */
+async function extractTopicsWithAi(archivedList) {
+  const topicsEl = document.getElementById('topics-explored');
+  const badgeEl = document.getElementById('topics-badge');
+  const listEl = document.getElementById('topic-list');
+  const footerEl = document.getElementById('footer-topics-count');
+  const footerNoteEl = document.getElementById('footer-ai-note');
+  const cardEl = document.getElementById('topics-card');
+
+  if (!archivedList || archivedList.length === 0) {
+    topicsEl.textContent = '\u2014';
+    if (badgeEl) badgeEl.hidden = true;
+    return;
+  }
+
+  // Build a cache key from a simple hash of archived URLs + timestamps
+  const cacheSignature = archivedList.map(a => `${a.url}|${a.timestamp}`).join('\n');
+  const cacheKey = simpleHash(cacheSignature);
+
+  // Check cache first
+  const { topicCache } = await chrome.storage.local.get('topicCache');
+  if (topicCache && topicCache.key === cacheKey && topicCache.topics) {
+    renderTopics(topicCache.topics, topicCache.source);
+    return;
+  }
+
+  // Check AI availability
+  const aiReady = await isAiAvailable();
+  if (!aiReady) {
+    // Fallback: use unique domains as "topics"
+    const domainTopics = [...new Set(archivedList.map(a => a.domain).filter(Boolean))];
+    const fallbackResult = { topics: domainTopics, source: 'domains' };
+    await chrome.storage.local.set({ topicCache: { key: cacheKey, ...fallbackResult } });
+    renderTopics(domainTopics, 'domains');
+    return;
+  }
+
+  // Show loading state
+  topicsEl.textContent = '…';
+  if (badgeEl) {
+    badgeEl.textContent = 'analyzing';
+    badgeEl.hidden = false;
+    badgeEl.className = 'stat-badge stat-badge--pending';
+  }
+
+  try {
+    // Build compact input — title + summary (or first 80 chars of URL) for each entry
+    const entries = archivedList.map(a => {
+      const desc = a.summary || a.url.substring(0, 80);
+      return `- ${a.title}: ${desc}`;
+    }).join('\n');
+
+    const session = await createAiSession();
+    const prompt = `Analyze these archived browser tabs and identify the distinct topics or themes the user was researching. Return ONLY a JSON array of short topic labels (2-4 words each, max 12 topics). Example: ["Machine Learning", "Travel Planning", "JavaScript Testing"]\n\nTabs:\n${entries}`;
+
+    const result = await session.prompt(prompt);
+    session.destroy();
+
+    // Parse the JSON array from the response
+    const jsonMatch = result.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) throw new Error('No JSON array in response');
+
+    const topics = JSON.parse(jsonMatch[0])
+      .filter(t => typeof t === 'string' && t.trim().length > 0)
+      .map(t => t.trim())
+      .slice(0, 12);
+
+    if (topics.length === 0) throw new Error('Empty topics');
+
+    // Cache the result
+    await chrome.storage.local.set({ topicCache: { key: cacheKey, topics, source: 'ai' } });
+    renderTopics(topics, 'ai');
+  } catch (err) {
+    console.warn('[Closure] AI topic extraction failed, using domain fallback:', err);
+    const domainTopics = [...new Set(archivedList.map(a => a.domain).filter(Boolean))];
+    await chrome.storage.local.set({ topicCache: { key: cacheKey, topics: domainTopics, source: 'domains' } });
+    renderTopics(domainTopics, 'domains');
+  }
+
+  /**
+   * Update the stat card, topic list, and footer with extracted topics.
+   */
+  function renderTopics(topics, source) {
+    const count = topics.length;
+    topicsEl.textContent = count;
+    footerEl.textContent = count;
+
+    // Badge indicates whether this is AI-derived or domain-based
+    if (badgeEl) {
+      if (source === 'ai') {
+        badgeEl.textContent = 'AI';
+        badgeEl.className = 'stat-badge stat-badge--ai';
+        badgeEl.title = 'Topics identified by on-device AI';
+      } else {
+        badgeEl.textContent = 'sites';
+        badgeEl.className = 'stat-badge stat-badge--fallback';
+        badgeEl.title = 'Unique sites (enable AI for real topic detection)';
+      }
+      badgeEl.hidden = false;
+    }
+
+    // Footer note
+    if (footerNoteEl) {
+      footerNoteEl.textContent = source === 'ai'
+        ? '— identified by on-device AI'
+        : '— unique sites visited';
+    }
+
+    // Populate the clickable topic list
+    if (listEl) {
+      listEl.innerHTML = '';
+      topics.forEach(topic => {
+        const li = document.createElement('li');
+        li.textContent = topic;
+        listEl.appendChild(li);
+      });
+      listEl.hidden = true; // collapsed by default
+    }
+
+    // Make the card clickable to toggle topic list
+    if (cardEl && listEl && topics.length > 0) {
+      cardEl.style.cursor = 'pointer';
+      cardEl.setAttribute('role', 'button');
+      cardEl.setAttribute('aria-expanded', 'false');
+      cardEl.setAttribute('aria-label', `${count} topics explored. Click to see list.`);
+      // Remove old listener if re-rendering
+      cardEl.removeEventListener('click', toggleTopicList);
+      cardEl.addEventListener('click', toggleTopicList);
+    }
+  }
+}
+
+/** Toggle visibility of the topic list under the stat card. */
+function toggleTopicList(e) {
+  // Don't toggle if clicking a button inside the card
+  if (e.target.closest('button')) return;
+  const listEl = document.getElementById('topic-list');
+  const cardEl = document.getElementById('topics-card');
+  if (!listEl) return;
+  const show = listEl.hidden;
+  listEl.hidden = !show;
+  if (cardEl) cardEl.setAttribute('aria-expanded', String(show));
+}
+
+/**
+ * Simple string hash for cache key comparison.
+ * Not cryptographic — just needs to detect when the archive has changed.
+ */
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + ch;
+    hash |= 0; // Convert to 32-bit integer
+  }
+  return hash;
 }
 
 /**

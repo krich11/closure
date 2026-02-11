@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.8.0
+ * @version 1.8.1
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
