@@ -56,7 +56,7 @@ Zero data exfiltration. No analytics, no telemetry, no remote calls of any kind.
 
 ## Support
 
-This extension is free and always will be. If it helps you, consider [buying the dev an energy drink](https://ko-fi.com/s/28c3a8d852).
+All core features are free and always will be. AI-powered features (summaries, topic grouping) are unlocked when you [buy the dev an energy drink](https://ko-fi.com/s/28c3a8d852) — your Ko-fi confirmation email contains the activation key.
 
 > *"This runs 100% locally. Support the code that keeps your privacy safe."*
 
