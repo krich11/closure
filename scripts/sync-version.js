@@ -69,6 +69,12 @@ function patchJson(filePath) {
     changed = true;
   }
 
+  // manifest.json has a version_name field for CWS display
+  if (json.version_name !== undefined && json.version_name !== VERSION) {
+    json.version_name = VERSION;
+    changed = true;
+  }
+
   // package-lock.json has a nested packages[""] entry
   if (json.packages && json.packages[''] && json.packages[''].version !== VERSION) {
     json.packages[''].version = VERSION;
