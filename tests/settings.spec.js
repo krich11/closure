@@ -209,6 +209,13 @@ test.describe('Settings Page — Toggles', () => {
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
     await page.waitForLoadState('domcontentloaded');
 
+    // Enable AI first (sub-controls are gated behind master toggle)
+    await page.locator('#enable-ai').click();
+    // Enter a license key to activate
+    await page.fill('#ai-license-input', 'TEST-KEY-1234');
+    await page.click('#ai-license-submit');
+    await page.waitForTimeout(300);
+
     const toggle = page.locator('#enable-clustering');
     await expect(toggle).toBeVisible();
 
@@ -228,6 +235,12 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
     await page.waitForLoadState('domcontentloaded');
+
+    // Enable AI first (topic grouping is AI-gated)
+    await page.locator('#enable-ai').click();
+    await page.fill('#ai-license-input', 'TEST-KEY-1234');
+    await page.click('#ai-license-submit');
+    await page.waitForTimeout(300);
 
     // Options should be hidden by default
     const options = page.locator('#topic-grouping-options');
@@ -254,6 +267,12 @@ test.describe('Settings Page — Toggles', () => {
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
     await page.waitForLoadState('domcontentloaded');
 
+    // Enable AI first (topic grouping is AI-gated)
+    await page.locator('#enable-ai').click();
+    await page.fill('#ai-license-input', 'TEST-KEY-1234');
+    await page.click('#ai-license-submit');
+    await page.waitForTimeout(300);
+
     // Enable topic grouping first so options are visible
     await page.locator('#enable-topic-grouping').click();
     await page.waitForTimeout(300);
@@ -273,6 +292,12 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
     await page.waitForLoadState('domcontentloaded');
+
+    // Enable AI first (topic grouping is AI-gated)
+    await page.locator('#enable-ai').click();
+    await page.fill('#ai-license-input', 'TEST-KEY-1234');
+    await page.click('#ai-license-submit');
+    await page.waitForTimeout(300);
 
     // Enable topic grouping first
     await page.locator('#enable-topic-grouping').click();
@@ -316,6 +341,12 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
     await page.waitForLoadState('domcontentloaded');
+
+    // Enable AI first
+    await page.locator('#enable-ai').click();
+    await page.fill('#ai-license-input', 'TEST-KEY-1234');
+    await page.click('#ai-license-submit');
+    await page.waitForTimeout(300);
 
     // Enable clustering
     await page.locator('#enable-clustering').click();

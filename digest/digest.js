@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Memory Lane (digest.js)
- * @version 1.8.1
+ * @version 1.8.2
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -48,6 +48,9 @@ async function loadAndRenderContent() {
   // Check if debug tools are enabled (controls re-summarize button visibility)
   createCard._debugEnabled = config?.enableDebugTools ?? false;
 
+  // Check if AI is enabled globally (controls AI-dependent features)
+  createCard._aiEnabled = config?.enableAI ?? false;
+
   // Render Stats — use actual array lengths, not running counters
   const archivedList = archived || [];
   const sweptList = swept || [];
@@ -67,7 +70,10 @@ async function loadAndRenderContent() {
   document.getElementById('footer-topics-count').textContent = domainCount;
 
   // Kick off AI topic extraction asynchronously (non-blocking)
-  extractTopicsWithAi(archivedList);
+  // Only attempt when AI is enabled in config
+  if (config?.enableAI) {
+    extractTopicsWithAi(archivedList);
+  }
 
   // Merge archived and swept into a unified feed
   // Tag each item with its source type so createCard can differentiate
@@ -176,9 +182,9 @@ function createCard(item) {
     summaryHtml = `<div class="card-summary">${formatSummary(item.summary)}</div>`;
   }
 
-  // Re-summarize button — only visible when debug tools are enabled
+  // Re-summarize button — only visible when debug tools AND AI are enabled
   // Uses timestamp as unique key since multiple entries can share the same URL
-  const showDebug = createCard._debugEnabled;
+  const showDebug = createCard._debugEnabled && createCard._aiEnabled;
   const resummarizeHtml = (!isSwept && showDebug)
     ? `<button class="resummarize-btn" data-url="${url}" data-title="${safeTitle}" data-ts="${item.timestamp}">Re-summarize</button>`
     : '';
@@ -279,18 +285,22 @@ async function setupEventListeners() {
       }
     } else if (e.target.classList.contains('restore-group-btn')) {
       const domain = e.target.dataset.domain;
-      // In a real app we would gather urls from DOM or re-query storage.
-      // Re-querying storage is safer.
       if (domain) {
-        const { archived } = await chrome.storage.local.get('archived');
-        const urlsToRestore = archived.filter(i => i.domain === domain).map(i => i.url);
-        
-        // Open them
+        // Query both archived and swept — swept tabs should be restorable too
+        const { archived, swept } = await chrome.storage.local.get(['archived', 'swept']);
+        const archivedUrls = (archived || [])
+          .filter(i => i.domain === domain)
+          .map(i => i.url);
+        const sweptUrls = (swept || [])
+          .filter(i => domainFromUrl(i.url) === domain)
+          .map(i => i.url);
+        const urlsToRestore = [...new Set([...archivedUrls, ...sweptUrls])];
+
         for (const u of urlsToRestore) {
           await chrome.tabs.create({ url: u, active: false });
         }
-        
-        e.target.textContent = 'All Restored';
+
+        e.target.textContent = urlsToRestore.length > 0 ? 'All Restored' : 'Nothing to restore';
         e.target.disabled = true;
       }
     } else if (e.target.classList.contains('resummarize-btn')) {
@@ -300,22 +310,32 @@ async function setupEventListeners() {
     }
   });
 
-  // Enable the Theme sort option when AI is available
+  // Enable the Theme sort option when AI is available AND enabled
   const themeOption = document.getElementById('sort-theme-option');
   const aiHint = document.getElementById('ai-hint');
   const aiHintLink = document.getElementById('ai-hint-link');
+  const { config: latestConfig } = await chrome.storage.local.get('config');
+  const aiEnabled = latestConfig?.enableAI ?? false;
   if (themeOption) {
-    const aiReady = await isAiAvailable();
-    if (aiReady) {
-      themeOption.disabled = false;
-      if (aiHint) aiHint.hidden = true;
+    if (!aiEnabled) {
+      themeOption.disabled = true;
+      if (aiHint) {
+        aiHint.textContent = 'AI is disabled in settings.';
+        aiHint.hidden = false;
+      }
     } else {
-      if (aiHint) aiHint.hidden = false;
-      if (aiHintLink) {
-        aiHintLink.addEventListener('click', (e) => {
-          e.preventDefault();
-          chrome.tabs.create({ url: chrome.runtime.getURL('settings/settings.html') });
-        });
+      const aiReady = await isAiAvailable();
+      if (aiReady) {
+        themeOption.disabled = false;
+        if (aiHint) aiHint.hidden = true;
+      } else {
+        if (aiHint) aiHint.hidden = false;
+        if (aiHintLink) {
+          aiHintLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            chrome.tabs.create({ url: chrome.runtime.getURL('settings/settings.html') });
+          });
+        }
       }
     }
   }
@@ -451,26 +471,43 @@ async function extractTopicsWithAi(archivedList) {
   }
 
   try {
-    // Build compact input — title + summary (or first 80 chars of URL) for each entry
-    const entries = archivedList.map(a => {
+    // ── Pass 1: Label each tab individually ──────────────────────
+    // Build a numbered list so AI assigns exactly one topic per tab
+    const entries = archivedList.map((a, i) => {
       const desc = a.summary || a.url.substring(0, 80);
-      return `- ${a.title}: ${desc}`;
+      return `${i + 1}. ${a.title}: ${desc}`;
     }).join('\n');
 
     const session = await createAiSession();
-    const prompt = `Analyze these archived browser tabs and identify the distinct topics or themes the user was researching. Return ONLY a JSON array of short topic labels (2-4 words each, max 12 topics). Example: ["Machine Learning", "Travel Planning", "JavaScript Testing"]\n\nTabs:\n${entries}`;
 
-    const result = await session.prompt(prompt);
+    const labelPrompt = `For each numbered browser tab below, assign a short topic label (2-4 words) describing what it is about. Return ONLY a JSON array of strings, one label per tab, in the same order.\n\nTabs:\n${entries}`;
+
+    const labelResult = await session.prompt(labelPrompt);
+
+    // Parse the per-tab labels
+    const labelMatch = labelResult.match(/\[[\s\S]*?\]/);
+    if (!labelMatch) throw new Error('No JSON array in label response');
+
+    const perTabLabels = JSON.parse(labelMatch[0])
+      .filter(t => typeof t === 'string' && t.trim().length > 0)
+      .map(t => t.trim());
+
+    if (perTabLabels.length === 0) throw new Error('Empty per-tab labels');
+
+    // ── Pass 2: Merge similar labels ─────────────────────────────
+    // Ask AI to deduplicate/consolidate the per-tab labels
+    const mergePrompt = `Here are topic labels assigned to individual browser tabs:\n${JSON.stringify(perTabLabels)}\n\nMerge similar or overlapping topics into a shorter deduplicated list. Return ONLY a JSON array of unique topic labels (2-4 words each).`;
+
+    const mergeResult = await session.prompt(mergePrompt);
     session.destroy();
 
-    // Parse the JSON array from the response
-    const jsonMatch = result.match(/\[[\s\S]*?\]/);
-    if (!jsonMatch) throw new Error('No JSON array in response');
+    const mergeMatch = mergeResult.match(/\[[\s\S]*?\]/);
+    if (!mergeMatch) throw new Error('No JSON array in merge response');
 
-    const topics = JSON.parse(jsonMatch[0])
+    const topics = JSON.parse(mergeMatch[0])
       .filter(t => typeof t === 'string' && t.trim().length > 0)
       .map(t => t.trim())
-      .slice(0, 12);
+      .slice(0, archivedList.length); // hard cap: never more topics than tabs
 
     if (topics.length === 0) throw new Error('Empty topics');
 

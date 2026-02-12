@@ -18,9 +18,36 @@
 
     <main>
       <!-- AI & Clustering -->
-      <section class="settings-section" aria-labelledby="section-ai">
+      <section class="settings-section" id="ai-section" aria-labelledby="section-ai">
         <h2 id="section-ai" class="section-title">AI Features</h2>
         <p class="section-desc">Closure uses Chrome's built-in Gemini Nano to summarize tabs before archiving them, and optionally to cluster your archived tabs by topic. Everything runs 100% on your device — no data ever leaves your machine.</p>
+
+        <!-- Master AI Toggle -->
+        <div class="field field-toggle ai-master-toggle">
+          <label for="enable-ai" class="field-label">
+            Enable AI
+            <span class="field-hint">Master switch — powers all AI features: tab summaries, topic grouping, and thematic clustering. Requires a license key.</span>
+          </label>
+          <button id="enable-ai" class="toggle" role="switch" aria-checked="false" type="button">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </button>
+        </div>
+
+        <!-- License Key Gate (shown when toggling on without a stored key) -->
+        <div id="ai-license-gate" class="ai-license-gate" hidden>
+          <div class="license-gate-inner">
+            <p class="license-gate-title">License Key Required</p>
+            <p class="license-gate-desc">Enter your AI license key to activate on-device intelligence. This key is stored locally and never transmitted.</p>
+            <div class="license-input-row">
+              <input type="text" id="ai-license-input" class="license-input" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" aria-label="AI license key">
+              <button id="ai-license-submit" class="btn btn-small" type="button">Activate</button>
+            </div>
+            <p id="ai-license-error" class="license-error" hidden></p>
+          </div>
+        </div>
+
+        <!-- AI sub-controls (grayed out when AI is off) -->
+        <div id="ai-sub-controls" class="ai-sub-controls ai-sub-controls--disabled">
 
         <div class="field field-toggle">
           <label for="enable-clustering" class="field-label">
@@ -62,6 +89,8 @@
             <p class="ai-setup-note">Requires macOS 13+, 22 GB free disk space, and either a GPU with >4 GB VRAM or 16 GB RAM. This unlocks AI-powered tab summaries and thematic clustering. Everything runs 100% on your machine.</p>
           </div>
         </details>
+
+        </div><!-- /ai-sub-controls -->
       </section>
 
       <!-- Auto-Grouping -->
@@ -78,6 +107,17 @@
           <output id="group-threshold-value" class="range-output" for="group-threshold">3</output>
         </div>
 
+        <div class="field field-toggle">
+          <label for="per-window-grouping" class="field-label">
+            Per-window grouping
+            <span class="field-hint">Only group tabs within the same window. When off, tabs from all windows are combined into a single group.</span>
+          </label>
+          <button id="per-window-grouping" class="toggle" role="switch" aria-checked="false" type="button">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </button>
+        </div>
+
+        <div class="ai-gated-control" id="topic-grouping-gate">
         <div class="field field-toggle">
           <label for="enable-topic-grouping" class="field-label">
             AI topic grouping
@@ -117,6 +157,7 @@
             </button>
           </div>
         </div>
+        </div><!-- /ai-gated-control -->
       </section>
 
       <!-- Graceful Exit -->
@@ -281,7 +322,7 @@
     </main>
 
     <footer class="settings-footer">
-      <p>Closure v1.8.1 — 100% local, 100% private.</p>
+      <p>Closure v1.8.2 — 100% local, 100% private.</p>
     </footer>
   </div>
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.8.1
+ * @version 1.8.2
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindRangeSlider('idle-threshold', 'idle-threshold-value', cfg.idleThresholdHours ?? 24, v => `${v}h`);
   bindRangeSlider('retention-days', 'retention-days-value', cfg.archiveRetentionDays ?? 0, formatRetention);
 
+  bindToggle('per-window-grouping', cfg.perWindowGrouping ?? false);
   bindToggle('enable-clustering', cfg.enableThematicClustering ?? false);
   bindToggle('high-contrast', cfg.highContrastMode ?? false);
   bindToggle('enable-debug', cfg.enableDebugTools ?? false);
@@ -24,6 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Rich page analysis — permission-gated, handled separately from normal toggles
   await initRichAnalysisToggle(cfg.enableRichPageAnalysis ?? false);
+
+  // Master AI toggle — gates all AI sub-controls
+  await initAiMasterToggle(cfg.enableAI ?? false, cfg.aiLicenseKey ?? '');
 
   // Topic grouping controls
   bindToggle('enable-topic-grouping', cfg.enableTopicGrouping ?? false);
@@ -118,6 +122,112 @@ function updateOvernightInteractivity() {
   const isOvernight = overnightBtn.getAttribute('aria-checked') === 'true';
   intervalSelect.disabled = isOvernight;
   intervalSelect.classList.toggle('field-select--disabled', isOvernight);
+}
+
+// ─── Rich Page Analysis (Permission-Gated Toggle) ────────────────
+
+// ─── Master AI Toggle (License Key Gated) ─────────────────────────
+
+/**
+ * Initialize the master AI toggle. When turning ON:
+ * - If a license key is already stored, activate immediately.
+ * - If not, reveal the license key input gate.
+ * When turning OFF, gray out all AI sub-controls.
+ */
+async function initAiMasterToggle(enabled, storedKey) {
+  const btn = document.getElementById('enable-ai');
+  const gateEl = document.getElementById('ai-license-gate');
+  const inputEl = document.getElementById('ai-license-input');
+  const submitBtn = document.getElementById('ai-license-submit');
+  const errorEl = document.getElementById('ai-license-error');
+  if (!btn) return;
+
+  // Pre-fill the stored key (masked display)
+  if (storedKey && inputEl) {
+    inputEl.value = storedKey;
+  }
+
+  btn.setAttribute('aria-checked', String(!!enabled));
+  applyAiDisabledState(!enabled);
+
+  btn.addEventListener('click', async () => {
+    const current = btn.getAttribute('aria-checked') === 'true';
+
+    if (current) {
+      // Turning OFF — just toggle and gray everything out
+      btn.setAttribute('aria-checked', 'false');
+      applyAiDisabledState(true);
+      if (gateEl) gateEl.hidden = true;
+      saveConfig();
+      return;
+    }
+
+    // Turning ON — check for stored license key
+    const existingKey = inputEl?.value?.trim();
+    if (existingKey) {
+      // Key already stored — activate immediately
+      btn.setAttribute('aria-checked', 'true');
+      applyAiDisabledState(false);
+      if (gateEl) gateEl.hidden = true;
+      saveConfig();
+    } else {
+      // No key — show the license gate (don't toggle yet)
+      if (gateEl) {
+        gateEl.hidden = false;
+        inputEl?.focus();
+      }
+    }
+  });
+
+  // License key submit handler
+  if (submitBtn && inputEl) {
+    const activateKey = () => {
+      const key = inputEl.value.trim();
+      if (!key) {
+        showLicenseError('Please enter a license key.');
+        return;
+      }
+      // Accept the key — store and activate
+      btn.setAttribute('aria-checked', 'true');
+      applyAiDisabledState(false);
+      if (gateEl) gateEl.hidden = true;
+      if (errorEl) errorEl.hidden = true;
+      saveConfig();
+      showSaveStatus('AI activated');
+    };
+
+    submitBtn.addEventListener('click', activateKey);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        activateKey();
+      }
+    });
+  }
+}
+
+function showLicenseError(msg) {
+  const el = document.getElementById('ai-license-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+  setTimeout(() => { el.hidden = true; }, 4000);
+}
+
+/**
+ * Enable/disable all AI sub-controls. When disabled, the controls
+ * are visually grayed out and non-interactive — a dormant state.
+ */
+function applyAiDisabledState(disabled) {
+  const subControls = document.getElementById('ai-sub-controls');
+  const topicGate = document.getElementById('topic-grouping-gate');
+
+  if (subControls) {
+    subControls.classList.toggle('ai-sub-controls--disabled', disabled);
+  }
+  if (topicGate) {
+    topicGate.classList.toggle('ai-gated-control--disabled', disabled);
+  }
 }
 
 // ─── Rich Page Analysis (Permission-Gated Toggle) ────────────────
@@ -225,9 +335,12 @@ function bindToggle(buttonId, initialValue) {
 async function saveConfig() {
   const newConfig = {
     groupThreshold: parseInt(document.getElementById('group-threshold')?.value, 10) || 3,
+    perWindowGrouping: document.getElementById('per-window-grouping')?.getAttribute('aria-checked') === 'true',
     idleThresholdHours: parseInt(document.getElementById('idle-threshold')?.value, 10) || 24,
     archiveRetentionDays: parseInt(document.getElementById('retention-days')?.value, 10) || 0,
     archiveSortBy: document.getElementById('archive-sort')?.value || 'recency',
+    enableAI: document.getElementById('enable-ai')?.getAttribute('aria-checked') === 'true',
+    aiLicenseKey: document.getElementById('ai-license-input')?.value?.trim() || '',
     enableThematicClustering: document.getElementById('enable-clustering')?.getAttribute('aria-checked') === 'true',
     enableRichPageAnalysis: document.getElementById('enable-rich-analysis')?.getAttribute('aria-checked') === 'true',
     enableTopicGrouping: document.getElementById('enable-topic-grouping')?.getAttribute('aria-checked') === 'true',

@@ -16,6 +16,11 @@ module.exports = defineConfig({
   workers: 1, // Extensions share browser state; parallelism causes flakiness
   reporter: [['list'], ['html', { open: 'never' }]],
 
+  // Skip @slow-tagged tests by default (alarm-bound, 30-47s each).
+  // Run them explicitly with: npm run test:slow
+  // Run everything with: npm run test:all
+  grepInvert: /@slow/,
+
   use: {
     // Headed mode is required for extension testing (MV3 service workers
     // don't load in headless Chromium).

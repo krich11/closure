@@ -8,7 +8,7 @@ const { test, expect } = require('./fixtures');
  * to the swept[] array with the correct structure.
  */
 
-test.describe('Dead End Sweeper — Integration', () => {
+test.describe('Dead End Sweeper — Integration @slow', () => {
   /**
    * Chrome MV3 alarms enforce a minimum delay of ~30 seconds.
    * These tests create error tabs with real HTTP URLs (so the sweeper's

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.8.1
+ * @version 1.8.2
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -13,11 +13,14 @@ const DEFAULT_CONFIG = {
   groupThreshold: 3,
   idleThresholdHours: 24,
   whitelist: [],
+  enableAI: false,
+  aiLicenseKey: '',
   enableThematicClustering: false,
   enableRichPageAnalysis: false,
   enableTopicGrouping: false,
   topicGroupingIntervalMinutes: 120,
   topicGroupingOvernightOnly: false,
+  perWindowGrouping: false,      // false = group across all windows, true = per-window only
   highContrastMode: false,
   archiveRetentionDays: 0,       // 0 = keep forever, 7–365 otherwise
   archiveSortBy: 'recency',      // 'recency' | 'domain'
@@ -297,10 +300,13 @@ async function evaluateAutoGroup(triggerTab) {
 
   const { config } = await chrome.storage.local.get('config');
   const threshold = config?.groupThreshold ?? DEFAULT_CONFIG.groupThreshold;
+  const perWindow = config?.perWindowGrouping ?? DEFAULT_CONFIG.perWindowGrouping;
 
-  // Query all tabs with the same domain across all windows.
-  // Exclude pinned tabs — they are immune to grouping.
-  const allTabs = await chrome.tabs.query({ pinned: false });
+  // Query tabs from the same domain. If perWindowGrouping is enabled,
+  // only consider tabs in the same window as the trigger tab.
+  const query = { pinned: false };
+  if (perWindow) query.windowId = triggerTab.windowId;
+  const allTabs = await chrome.tabs.query(query);
   const sameDomainTabs = allTabs.filter((t) => getRootDomain(t.url) === domain);
 
   // Not enough to group yet
@@ -317,6 +323,10 @@ async function evaluateAutoGroup(triggerTab) {
 
     if (ungroupedIds.length > 0) {
       await chrome.tabs.group({ tabIds: ungroupedIds, groupId: existingGroup.id });
+
+      // If tabs were pulled from other windows, focus the destination
+      // window so the user can see where their tab went.
+      await focusGroupWindow(existingGroup.id);
     }
 
     // Move the group to the leftmost position (after pinned tabs)
@@ -330,11 +340,29 @@ async function evaluateAutoGroup(triggerTab) {
     await chrome.tabGroups.update(groupId, {
       title: domain.toUpperCase(),
       color: GROUP_COLORS[colorIndex],
-      collapsed: true,
     });
 
     // Move the new group to the leftmost position (after pinned tabs)
     await moveGroupToLeft(groupId);
+
+    // If tabs were pulled from multiple windows, focus the window
+    // that now holds the group so the user sees where they went.
+    await focusGroupWindow(groupId);
+
+    // Collapse after moving — move can reset collapsed state.
+    // Chrome won't collapse a group containing the active tab, so
+    // activate a tab outside the group first if needed.
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId: sameDomainTabs[0].windowId });
+      if (activeTab && activeTab.groupId === groupId) {
+        const outsideTab = (await chrome.tabs.query({ windowId: activeTab.windowId }))
+          .find((t) => t.groupId !== groupId && !t.pinned);
+        if (outsideTab) await chrome.tabs.update(outsideTab.id, { active: true });
+      }
+      await chrome.tabGroups.update(groupId, { collapsed: true });
+    } catch (err) {
+      console.debug('[Closure] collapse after group creation error:', err.message);
+    }
   }
 }
 
@@ -358,6 +386,30 @@ async function moveGroupToLeft(groupId) {
   } catch (err) {
     // Group may have been removed between query and move — that's fine
     console.debug('[Closure] moveGroupToLeft error:', err.message);
+  }
+}
+
+/**
+ * Focus the window containing a tab group and activate one of its tabs
+ * so the user can see where their tabs were moved. This handles the
+ * cross-window case where chrome.tabs.group() silently pulls tabs
+ * from another window into the group's window.
+ *
+ * @param {number} groupId
+ */
+async function focusGroupWindow(groupId) {
+  try {
+    const groupTabs = await chrome.tabs.query({ groupId });
+    if (groupTabs.length === 0) return;
+
+    const windowId = groupTabs[0].windowId;
+    await chrome.windows.update(windowId, { focused: true });
+
+    // Activate the most recently accessed tab in the group so it's visible
+    const sorted = [...groupTabs].sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+    await chrome.tabs.update(sorted[0].id, { active: true });
+  } catch (err) {
+    console.debug('[Closure] focusGroupWindow error:', err.message);
   }
 }
 
@@ -390,6 +442,13 @@ async function findExistingGroup(domain) {
 async function runTopicGrouping({ manual = false } = {}) {
   console.debug(`[Closure:TopicGroup] Starting topic grouping run... (manual: ${manual})`);
   const { config } = await chrome.storage.local.get('config');
+
+  // Gate: AI must be enabled for topic grouping to work
+  if (!config?.enableAI) {
+    console.debug('[Closure:TopicGroup] Skipped — AI is disabled');
+    return;
+  }
+
   if (!manual && !config?.enableTopicGrouping) {
     console.debug('[Closure:TopicGroup] Skipped — feature disabled in config');
     return;
@@ -598,6 +657,13 @@ async function ensureOffscreen() {
  * @returns {Promise<string|null>}
  */
 async function promptAi(prompt) {
+  // Gate: skip AI entirely when disabled in config
+  const { config } = await chrome.storage.local.get('config');
+  if (!config?.enableAI) {
+    console.debug('[Closure:AI] AI is disabled — skipping prompt');
+    return null;
+  }
+
   try {
     await ensureOffscreen();
     const response = await chrome.runtime.sendMessage({

@@ -340,6 +340,7 @@ test.describe('Digest — Stats Display', () => {
         });
       }
       await chrome.storage.local.set({
+        config: { enableAI: true },
         archived: items,
         stats: { tabsTidiedThisWeek: 12, ramSavedEstimate: 600 },
       });

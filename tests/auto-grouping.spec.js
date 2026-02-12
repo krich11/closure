@@ -7,7 +7,7 @@ const { test, expect } = require('./fixtures');
  * automatic tab grouping with the correct group name and color.
  */
 
-test.describe('Clean Slate Automator — Auto-Grouping', () => {
+test.describe('Clean Slate Automator — Auto-Grouping @slow', () => {
   test('opening tabs from the same domain creates a tab group', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
@@ -238,16 +238,18 @@ test.describe('Clean Slate Automator — Auto-Grouping', () => {
       await tab.goto('https://example.com/collapse' + i);
       await tab.waitForLoadState('domcontentloaded');
     }
-    await page.waitForTimeout(2000);
-
-    // Get the created group
+    // Poll until the group exists AND is collapsed (collapse may be async)
     const group = await page.evaluate(async () => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const groups = await chrome.tabGroups.query({ title: 'EXAMPLE.COM' });
+        if (groups.length && groups[0].collapsed) return groups[0];
+        await new Promise(r => setTimeout(r, 500));
+      }
+      // Return whatever we have if it never collapsed
       const groups = await chrome.tabGroups.query({ title: 'EXAMPLE.COM' });
       return groups[0] || null;
     });
     expect(group).toBeTruthy();
-
-    // Group should be collapsed immediately
     expect(group.collapsed).toBe(true);
   });
 });
