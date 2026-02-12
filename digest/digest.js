@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Memory Lane (digest.js)
- * @version 1.8.2
+ * @version 2.0.0
  *
  * Renders the weekly archival dashboard.
  * - Restores tabs/groups
@@ -67,7 +67,6 @@ async function loadAndRenderContent() {
   const domains = new Set(archivedList.map(item => item.domain));
   const domainCount = domains.size;
   document.getElementById('topics-explored').textContent = domainCount || '\u2014';
-  document.getElementById('footer-topics-count').textContent = domainCount;
 
   // Kick off AI topic extraction asynchronously (non-blocking)
   // Only attempt when AI is enabled in config
@@ -527,7 +526,7 @@ async function extractTopicsWithAi(archivedList) {
   function renderTopics(topics, source) {
     const count = topics.length;
     topicsEl.textContent = count;
-    footerEl.textContent = count;
+    if (footerEl) footerEl.textContent = count;
 
     // Badge indicates whether this is AI-derived or domain-based
     if (badgeEl) {

@@ -11,7 +11,6 @@ test.describe('Onboarding — Step Navigation', () => {
   test('onboarding page loads with step 1 visible', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Step 1 (welcome) should be visible
     const step1 = page.locator('#step-welcome');
@@ -26,7 +25,6 @@ test.describe('Onboarding — Step Navigation', () => {
   test('clicking Next navigates to step 2', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Click the "Let's Set Things Up" button
     await page.locator('[data-next="step-permissions"]').click();
@@ -39,7 +37,6 @@ test.describe('Onboarding — Step Navigation', () => {
   test('clicking Back returns to previous step', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Go to step 2
     await page.locator('[data-next="step-permissions"]').click();
@@ -56,7 +53,6 @@ test.describe('Onboarding — Step Navigation', () => {
   test('full navigation through all 4 steps', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Step 1 → 2
     await page.locator('[data-next="step-permissions"]').click();
@@ -81,7 +77,6 @@ test.describe('Onboarding — Progress Dots', () => {
   test('first dot is active on load', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const firstDot = page.locator('[data-step="step-welcome"]');
     const hasActive = await firstDot.evaluate((el) => el.classList.contains('dot--active'));
@@ -91,7 +86,6 @@ test.describe('Onboarding — Progress Dots', () => {
   test('dots update when navigating between steps', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to step 2
     await page.locator('[data-next="step-permissions"]').click();
@@ -111,7 +105,6 @@ test.describe('Onboarding — Progress Dots', () => {
   test('all 4 progress dots exist', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const dots = page.locator('.dot');
     await expect(dots).toHaveCount(4);
@@ -122,7 +115,6 @@ test.describe('Onboarding — Close Button', () => {
   test('close button marks onboarding as completed in storage', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to the final step
     await page.locator('[data-next="step-permissions"]').click();
@@ -133,15 +125,10 @@ test.describe('Onboarding — Close Button', () => {
     const closeBtn = page.locator('#close-onboarding');
     await expect(closeBtn).toBeVisible();
 
-    // Click the button — it will close the tab via chrome.tabs.remove,
-    // which destroys the page context. Wrap in try/catch.
-    try {
-      await closeBtn.click();
-      // Give time for the storage write (may throw if page closed)
-      await page.waitForTimeout(500);
-    } catch {
-      // Expected: page was destroyed by chrome.tabs.remove — that's fine
-    }
+    // dispatchEvent fires the click synchronously; the async handler
+    // writes storage then calls chrome.tabs.remove, closing the page.
+    await closeBtn.dispatchEvent('click');
+    await page.waitForEvent('close').catch(() => {});
 
     // Open a new page to check storage (onboarding tab was closed)
     const checkPage = await context.newPage();
@@ -158,7 +145,6 @@ test.describe('Onboarding — Close Button', () => {
   test('close button appears only on final step', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Close button should not be visible on step 1
     await expect(page.locator('#close-onboarding')).toBeHidden();
@@ -179,7 +165,6 @@ test.describe('Onboarding — Content & Accessibility', () => {
   test('page has correct heading structure', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const h1 = page.locator('#welcome-heading');
     await expect(h1).toBeVisible();
@@ -197,7 +182,6 @@ test.describe('Onboarding — Content & Accessibility', () => {
   test('steps have aria-labelledby attributes', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const steps = ['step-welcome', 'step-permissions', 'step-features', 'step-ready'];
     for (const stepId of steps) {
@@ -209,7 +193,6 @@ test.describe('Onboarding — Content & Accessibility', () => {
   test('progress dots have aria-labels', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const dots = page.locator('.dot');
     const count = await dots.count();
@@ -223,7 +206,6 @@ test.describe('Onboarding — Content & Accessibility', () => {
   test('permission list displays all 6 permissions', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to step 2 to see permission list
     await page.locator('[data-next="step-permissions"]').click();
@@ -235,7 +217,6 @@ test.describe('Onboarding — Content & Accessibility', () => {
   test('feature tour displays 4 feature cards', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to step 3
     await page.locator('[data-next="step-permissions"]').click();

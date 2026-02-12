@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Graceful Exit Tests
- * @version 1.8.2
+ * @version 2.0.0
  *
  * Verifies the archival flow: idle detection, AI summarization
  * (via offscreen document), storage persistence, notifications,
@@ -73,7 +73,7 @@ test.describe('Graceful Exit — Archival Flow', () => {
 
     // Create and pin a tab
     const pinnedPage = await context.newPage();
-    await pinnedPage.goto('https://example.com');
+    await pinnedPage.goto('https://example.com', { waitUntil: 'commit' });
 
     await page.evaluate(async () => {
       const tabs = await chrome.tabs.query({ url: '*://example.com/*' });
@@ -109,34 +109,18 @@ test.describe('Graceful Exit — Archival Flow', () => {
 });
 
 test.describe('Graceful Exit — Nuclear Archive', () => {
-  test('nuclear archive button exists and is interactive', async ({ context, extensionId }) => {
+  test('nuclear archive sends message and gets response', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
-    const btn = page.locator('#archive-now');
-    await expect(btn).toBeVisible();
-    await expect(btn).toBeEnabled();
-    expect(await btn.textContent()).toBe('Archive Idle Tabs Now');
-  });
+    // Send the nuclear archive message directly (button removed from popup)
+    const response = await page.evaluate(async () => {
+      return chrome.runtime.sendMessage({ action: 'nuclearArchive' });
+    });
 
-  test('nuclear archive sends message and updates button', async ({ context, extensionId }) => {
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    // Click the nuclear archive button
-    await page.locator('#archive-now').click();
-
-    // Button should show "Archiving..." state
-    // (it may quickly resolve to "No idle tabs found" since test tabs aren't idle)
-    await page.waitForTimeout(500);
-
-    const btnText = await page.locator('#archive-now').textContent();
-    // Should be one of the post-click states
-    expect(
-      btnText === 'Archiving...' ||
-      btnText === 'No idle tabs found' ||
-      btnText.includes('Archived')
-    ).toBe(true);
+    // Should get a response object with a count
+    expect(response).toBeTruthy();
+    expect(typeof response.count).toBe('number');
   });
 
   test('stats update after archival operations', async ({ context, extensionId }) => {
@@ -197,12 +181,10 @@ test.describe('Graceful Exit — Stay of Execution', () => {
     });
 
     await page.locator('#open-digest').click();
-    await page.waitForTimeout(500);
 
-    const tabsAfter = await page.evaluate(async () => {
-      return (await chrome.tabs.query({})).length;
-    });
-
-    expect(tabsAfter).toBeGreaterThan(tabsBefore);
+    await expect(async () => {
+      const tabsAfter = await page.evaluate(async () => (await chrome.tabs.query({})).length);
+      expect(tabsAfter).toBeGreaterThan(tabsBefore);
+    }).toPass({ timeout: 5000 });
   });
 });

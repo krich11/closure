@@ -16,7 +16,7 @@ test.describe('Safety Net — Pinned Tab Immunity', () => {
     const tabs = [];
     for (let i = 0; i < 4; i++) {
       const tab = await context.newPage();
-      await tab.goto('https://example.com');
+      await tab.goto('https://example.com', { waitUntil: 'commit' });
       tabs.push(tab);
     }
 

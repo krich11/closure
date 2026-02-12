@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 1.8.2
+ * @version 2.0.0
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -27,7 +27,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initRichAnalysisToggle(cfg.enableRichPageAnalysis ?? false);
 
   // Master AI toggle — gates all AI sub-controls
-  await initAiMasterToggle(cfg.enableAI ?? false, cfg.aiLicenseKey ?? '');
+  await initAiMasterToggle(cfg.enableAI ?? false, cfg.aiSupporterCode ?? cfg.aiLicenseKey ?? '', cfg.aiActivated ?? false);
+  aiActivatedFlag = cfg.aiActivated ?? false;
 
   // Topic grouping controls
   bindToggle('enable-topic-grouping', cfg.enableTopicGrouping ?? false);
@@ -41,6 +42,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadWhitelist(cfg.whitelist ?? []);
   setupWhitelistInput();
   setupClearStorage();
+  setupZeroize();
+  updateZeroizeVisibility(cfg.enableDebugTools ?? false);
   checkIncognito();
 });
 
@@ -126,15 +129,51 @@ function updateOvernightInteractivity() {
 
 // ─── Rich Page Analysis (Permission-Gated Toggle) ────────────────
 
-// ─── Master AI Toggle (License Key Gated) ─────────────────────────
+// ─── Supporter Code Validation ────────────────────────────────────
+
+// Module-level flag: true once a valid supporter code has been entered.
+// Persisted to storage so supporters are grandfathered across code rotations.
+let aiActivatedFlag = false;
+
+/**
+ * Valid supporter code hashes (SHA-256, hex-encoded).
+ * To add a new code: run in DevTools console:
+ *   crypto.subtle.digest('SHA-256', new TextEncoder().encode('YOUR-CODE')).then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join('')))
+ * Then add the resulting hash to this array.
+ */
+const VALID_CODE_HASHES = [
+  // CLOSURE-SUPPORTER-2026
+  '913e13aa306177e8c0bb6302571ef7a9739803857d07337f9e66b345f463df21',
+];
+
+/**
+ * Hash a supporter code with SHA-256 and return hex string.
+ * Uses Web Crypto API (built-in, no network).
+ */
+async function hashCode(code) {
+  const data = new TextEncoder().encode(code.trim().toUpperCase());
+  const buffer = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Validate a supporter code against the known hash list.
+ */
+async function isValidSupporterCode(code) {
+  if (!code || !code.trim()) return false;
+  const hash = await hashCode(code);
+  return VALID_CODE_HASHES.includes(hash);
+}
+
+// ─── Master AI Toggle (Supporter Code Gated) ──────────────────────
 
 /**
  * Initialize the master AI toggle. When turning ON:
- * - If a license key is already stored, activate immediately.
- * - If not, reveal the license key input gate.
+ * - If a valid supporter code is already stored, activate immediately.
+ * - If not, reveal the supporter code input gate.
  * When turning OFF, gray out all AI sub-controls.
  */
-async function initAiMasterToggle(enabled, storedKey) {
+async function initAiMasterToggle(enabled, storedKey, alreadyActivated) {
   const btn = document.getElementById('enable-ai');
   const gateEl = document.getElementById('ai-license-gate');
   const inputEl = document.getElementById('ai-license-input');
@@ -142,7 +181,7 @@ async function initAiMasterToggle(enabled, storedKey) {
   const errorEl = document.getElementById('ai-license-error');
   if (!btn) return;
 
-  // Pre-fill the stored key (masked display)
+  // Pre-fill the stored code (masked display)
   if (storedKey && inputEl) {
     inputEl.value = storedKey;
   }
@@ -162,38 +201,54 @@ async function initAiMasterToggle(enabled, storedKey) {
       return;
     }
 
-    // Turning ON — check for stored license key
-    const existingKey = inputEl?.value?.trim();
-    if (existingKey) {
-      // Key already stored — activate immediately
+    // Turning ON — grandfathered supporters skip validation
+    if (aiActivatedFlag) {
       btn.setAttribute('aria-checked', 'true');
       applyAiDisabledState(false);
       if (gateEl) gateEl.hidden = true;
       saveConfig();
+      return;
+    }
+
+    // Check for stored supporter code
+    const existingKey = inputEl?.value?.trim();
+    if (existingKey && await isValidSupporterCode(existingKey)) {
+      // Valid code already stored — activate immediately
+      btn.setAttribute('aria-checked', 'true');
+      applyAiDisabledState(false);
+      if (gateEl) gateEl.hidden = true;
+      aiActivatedFlag = true;
+      saveConfig();
     } else {
-      // No key — show the license gate (don't toggle yet)
+      // No code or invalid — show the gate (don't toggle yet)
       if (gateEl) {
         gateEl.hidden = false;
+        if (inputEl) inputEl.value = ''; // clear any invalid stored code
         inputEl?.focus();
       }
     }
   });
 
-  // License key submit handler
+  // Supporter code submit handler
   if (submitBtn && inputEl) {
-    const activateKey = () => {
-      const key = inputEl.value.trim();
-      if (!key) {
-        showLicenseError('Please enter a license key.');
+    const activateKey = async () => {
+      const code = inputEl.value.trim();
+      if (!code) {
+        showLicenseError('Please enter your supporter code.');
         return;
       }
-      // Accept the key — store and activate
+      if (!await isValidSupporterCode(code)) {
+        showLicenseError('Invalid code. Check your Ko-fi donation receipt and try again.');
+        return;
+      }
+      // Valid — store and activate, set grandfathered flag
       btn.setAttribute('aria-checked', 'true');
       applyAiDisabledState(false);
       if (gateEl) gateEl.hidden = true;
       if (errorEl) errorEl.hidden = true;
+      aiActivatedFlag = true;
       saveConfig();
-      showSaveStatus('AI activated');
+      showSaveStatus('AI activated — thank you for your support!');
     };
 
     submitBtn.addEventListener('click', activateKey);
@@ -322,6 +377,10 @@ function bindToggle(buttonId, initialValue) {
       updateTopicGroupingVisibility(!current);
     }
 
+    if (buttonId === 'enable-debug') {
+      updateZeroizeVisibility(!current);
+    }
+
     if (buttonId === 'topic-grouping-overnight') {
       updateOvernightInteractivity();
     }
@@ -340,7 +399,8 @@ async function saveConfig() {
     archiveRetentionDays: parseInt(document.getElementById('retention-days')?.value, 10) || 0,
     archiveSortBy: document.getElementById('archive-sort')?.value || 'recency',
     enableAI: document.getElementById('enable-ai')?.getAttribute('aria-checked') === 'true',
-    aiLicenseKey: document.getElementById('ai-license-input')?.value?.trim() || '',
+    aiSupporterCode: document.getElementById('ai-license-input')?.value?.trim() || '',
+    aiActivated: aiActivatedFlag,
     enableThematicClustering: document.getElementById('enable-clustering')?.getAttribute('aria-checked') === 'true',
     enableRichPageAnalysis: document.getElementById('enable-rich-analysis')?.getAttribute('aria-checked') === 'true',
     enableTopicGrouping: document.getElementById('enable-topic-grouping')?.getAttribute('aria-checked') === 'true',
@@ -723,8 +783,10 @@ function setupClearStorage() {
 
     await chrome.storage.local.remove(removals);
 
-    // If config was cleared, re-initialise defaults
+    // If config was cleared, preserve the supporter activation flag
+    // so grandfathered supporters keep AI access across code rotations
     if (keys.includes('config')) {
+      await chrome.storage.local.set({ config: { aiActivated: aiActivatedFlag } });
       location.reload();
       return;
     }
@@ -738,6 +800,42 @@ function setupClearStorage() {
       confirmBtn.disabled = false;
       dialog.close();
     }, 1200);
+  });
+}
+
+/**
+ * Show/hide the Zeroize button based on debug mode.
+ */
+function updateZeroizeVisibility(debugEnabled) {
+  const btn = document.getElementById('zeroize-btn');
+  if (btn) btn.hidden = !debugEnabled;
+}
+
+/**
+ * Set up the Zeroize button — a true factory reset that wipes everything,
+ * including the aiActivated flag. Only visible in debug mode.
+ */
+function setupZeroize() {
+  const btn = document.getElementById('zeroize-btn');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    const confirmed = confirm(
+      'ZEROIZE: This will erase ALL Closure data including your supporter activation. ' +
+      'You will need to re-enter a valid supporter code to use AI features.\n\n' +
+      'This cannot be undone. Continue?'
+    );
+    if (!confirmed) return;
+
+    await chrome.storage.local.clear();
+    aiActivatedFlag = false;
+
+    // Force AI toggle off so UI state is consistent before reload
+    const aiBtn = document.getElementById('enable-ai');
+    if (aiBtn) aiBtn.setAttribute('aria-checked', 'false');
+    applyAiDisabledState(true);
+
+    location.reload();
   });
 }
 

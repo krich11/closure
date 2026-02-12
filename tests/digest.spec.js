@@ -6,17 +6,23 @@ const { test, expect } = require('./fixtures');
  * Verify that archived entries render as cards, restore button
  * works, sort control toggles between recency and domain,
  * and stats display correctly.
+ *
+ * Seeding pattern: navigate to digest.html, seed storage via
+ * evaluate(), then reload — avoids opening a separate seed page.
  */
+
+// ─── Helper: seed storage and reload digest ────────────────────
+async function seedAndReload(page, extensionId, data) {
+  await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
+  await page.evaluate(async (d) => chrome.storage.local.set(d), data);
+  await page.reload();
+}
 
 test.describe('Digest — Rendering Archived Entries', () => {
   test('archived entries render as cards grouped by domain', async ({ context, extensionId }) => {
-    // Seed archived data before loading digest
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [
+    const page = await context.newPage();
+    await seedAndReload(page, extensionId, {
+      archived: [
           {
             url: 'https://example.com/page1',
             title: 'Example Page 1',
@@ -46,214 +52,140 @@ test.describe('Digest — Rendering Archived Entries', () => {
           },
         ],
         stats: { tabsTidiedThisWeek: 3, ramSavedEstimate: 150 },
-      });
     });
 
-    // Open digest
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
-
-    // Verify cards are rendered
-    const cards = page.locator('.archive-card');
-    await expect(cards).toHaveCount(3);
-
-    // Verify domain groups
-    const groups = page.locator('.archive-group');
-    await expect(groups).toHaveCount(2); // example.com + other.org
+    await expect(page.locator('.archive-card').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.archive-card')).toHaveCount(3);
+    await expect(page.locator('.archive-group')).toHaveCount(2);
   });
 
   test('empty state message shown when no archived entries', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [],
-        stats: { tabsTidiedThisWeek: 0, ramSavedEstimate: 0 },
-      });
+    const page = await context.newPage();
+    await seedAndReload(page, extensionId, {
+      archived: [],
+      stats: { tabsTidiedThisWeek: 0, ramSavedEstimate: 0 },
     });
 
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
-
-    const emptyState = page.locator('#archive-feed .empty-state');
-    await expect(emptyState).toBeVisible();
+    await expect(page.locator('#archive-feed .empty-state')).toBeVisible({ timeout: 5000 });
   });
 
   test('cards display title, summary, and timestamp', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [{
-          url: 'https://example.com/detailed',
-          title: 'Detailed Test Card',
-          favicon: '',
-          timestamp: Date.now(),
-          summary: 'This is a detailed summary for testing card rendering.',
-          summaryType: 'ai',
-          domain: 'example.com',
-        }],
-        swept: [],
-        stats: { tabsTidiedThisWeek: 1, ramSavedEstimate: 50 },
-      });
+    const page = await context.newPage();
+    await seedAndReload(page, extensionId, {
+      archived: [{
+        url: 'https://example.com/detailed',
+        title: 'Detailed Test Card',
+        favicon: '',
+        timestamp: Date.now(),
+        summary: 'This is a detailed summary for testing card rendering.',
+        summaryType: 'ai',
+        domain: 'example.com',
+      }],
+      swept: [],
+      stats: { tabsTidiedThisWeek: 1, ramSavedEstimate: 50 },
     });
 
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
-
-    // Verify card content
-    const cardTitle = page.locator('.card-title').first();
-    await expect(cardTitle).toContainText('Detailed Test Card');
-
-    const cardSummary = page.locator('.card-summary').first();
-    await expect(cardSummary).toContainText('detailed summary');
-
-    const timestamp = page.locator('.card-timestamp').first();
-    await expect(timestamp).toBeVisible();
+    await expect(page.locator('.archive-card').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.card-title').first()).toContainText('Detailed Test Card');
+    await expect(page.locator('.card-summary').first()).toContainText('detailed summary');
+    await expect(page.locator('.card-timestamp').first()).toBeVisible();
   });
 
   test('group header shows uppercased domain name', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [{
-          url: 'https://mysite.io/page',
-          title: 'MySite Page',
-          favicon: '',
-          timestamp: Date.now(),
-          summary: 'A page from mysite.io.',
-          summaryType: 'fallback',
-          domain: 'mysite.io',
-        }],
-        stats: { tabsTidiedThisWeek: 1, ramSavedEstimate: 50 },
-      });
+    const page = await context.newPage();
+    await seedAndReload(page, extensionId, {
+      archived: [{
+        url: 'https://mysite.io/page',
+        title: 'MySite Page',
+        favicon: '',
+        timestamp: Date.now(),
+        summary: 'A page from mysite.io.',
+        summaryType: 'fallback',
+        domain: 'mysite.io',
+      }],
+      stats: { tabsTidiedThisWeek: 1, ramSavedEstimate: 50 },
     });
 
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
-
-    const groupTitle = page.locator('.group-title').first();
-    await expect(groupTitle).toContainText('MYSITE.IO');
+    await expect(page.locator('.group-title').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.group-title').first()).toContainText('MYSITE.IO');
   });
 });
 
 test.describe('Digest — Restore Functionality', () => {
   test('restore button opens a new tab with the archived URL', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [{
-          url: 'https://example.com/restore-me',
-          title: 'Restore Me',
-          favicon: '',
-          timestamp: Date.now(),
-          summary: 'A page to restore.',
-          summaryType: 'fallback',
-          domain: 'example.com',
-        }],
-        stats: { tabsTidiedThisWeek: 1, ramSavedEstimate: 50 },
-      });
+    const page = await context.newPage();
+    await seedAndReload(page, extensionId, {
+      archived: [{
+        url: 'https://example.com/restore-me',
+        title: 'Restore Me',
+        favicon: '',
+        timestamp: Date.now(),
+        summary: 'A page to restore.',
+        summaryType: 'fallback',
+        domain: 'example.com',
+      }],
+      stats: { tabsTidiedThisWeek: 1, ramSavedEstimate: 50 },
     });
 
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
+    await expect(page.locator('.archive-card').first()).toBeVisible({ timeout: 5000 });
 
-    // Count tabs before restore
     const tabsBefore = await page.evaluate(async () => {
       return (await chrome.tabs.query({})).length;
     });
 
-    // Click restore button
     const restoreBtn = page.locator('.restore-btn').first();
     await expect(restoreBtn).toBeVisible();
     await restoreBtn.click();
-    await page.waitForTimeout(500);
+    await expect(restoreBtn).toHaveText('Restored', { timeout: 5000 });
 
-    // Verify a new tab was opened
     const tabsAfter = await page.evaluate(async () => {
       return (await chrome.tabs.query({})).length;
     });
     expect(tabsAfter).toBeGreaterThan(tabsBefore);
-
-    // Verify button text changed to "Restored"
-    const btnText = await restoreBtn.textContent();
-    expect(btnText).toBe('Restored');
-
-    // Verify button is disabled
     await expect(restoreBtn).toBeDisabled();
   });
 
   test('restore group button opens all tabs in a domain group', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [
-          {
-            url: 'https://example.com/group1',
-            title: 'Group 1',
-            favicon: '',
-            timestamp: Date.now(),
-            summary: 'First.',
-            summaryType: 'fallback',
-            domain: 'example.com',
-          },
-          {
-            url: 'https://example.com/group2',
-            title: 'Group 2',
-            favicon: '',
-            timestamp: Date.now() - 1000,
-            summary: 'Second.',
-            summaryType: 'fallback',
-            domain: 'example.com',
-          },
-        ],
-        stats: { tabsTidiedThisWeek: 2, ramSavedEstimate: 100 },
-      });
+    const page = await context.newPage();
+    await seedAndReload(page, extensionId, {
+      archived: [
+        {
+          url: 'https://example.com/group1',
+          title: 'Group 1',
+          favicon: '',
+          timestamp: Date.now(),
+          summary: 'First.',
+          summaryType: 'fallback',
+          domain: 'example.com',
+        },
+        {
+          url: 'https://example.com/group2',
+          title: 'Group 2',
+          favicon: '',
+          timestamp: Date.now() - 1000,
+          summary: 'Second.',
+          summaryType: 'fallback',
+          domain: 'example.com',
+        },
+      ],
+      stats: { tabsTidiedThisWeek: 2, ramSavedEstimate: 100 },
     });
 
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
+    await expect(page.locator('.archive-card').first()).toBeVisible({ timeout: 5000 });
 
     const tabsBefore = await page.evaluate(async () => {
       return (await chrome.tabs.query({})).length;
     });
 
-    // Click "Restore Group" button
     const restoreGroupBtn = page.locator('.restore-group-btn').first();
     await expect(restoreGroupBtn).toBeVisible();
     await restoreGroupBtn.click();
-    await page.waitForTimeout(1000);
+    await expect(restoreGroupBtn).toHaveText('All Restored', { timeout: 5000 });
 
     const tabsAfter = await page.evaluate(async () => {
       return (await chrome.tabs.query({})).length;
     });
-
-    // Should have opened 2 tabs
     expect(tabsAfter).toBeGreaterThanOrEqual(tabsBefore + 2);
-
-    // Button should show "All Restored"
-    const btnText = await restoreGroupBtn.textContent();
-    expect(btnText).toBe('All Restored');
   });
 });
 
@@ -261,7 +193,6 @@ test.describe('Digest — Sort Control', () => {
   test('sort control exists with recency and domain options', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const sortSelect = page.locator('#sort-select');
     await expect(sortSelect).toBeVisible();
@@ -273,136 +204,80 @@ test.describe('Digest — Sort Control', () => {
   });
 
   test('switching sort re-renders the feed', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [
-          {
-            url: 'https://alpha.com/page',
-            title: 'Alpha Page',
-            favicon: '',
-            timestamp: Date.now() - 20000,
-            summary: 'Alpha summary.',
-            summaryType: 'fallback',
-            domain: 'alpha.com',
-          },
-          {
-            url: 'https://zeta.com/page',
-            title: 'Zeta Page',
-            favicon: '',
-            timestamp: Date.now(),
-            summary: 'Zeta summary.',
-            summaryType: 'fallback',
-            domain: 'zeta.com',
-          },
-        ],
-        stats: { tabsTidiedThisWeek: 2, ramSavedEstimate: 100 },
-      });
+    const page = await context.newPage();
+    await seedAndReload(page, extensionId, {
+      archived: [
+        {
+          url: 'https://alpha.com/page',
+          title: 'Alpha Page',
+          favicon: '',
+          timestamp: Date.now() - 20000,
+          summary: 'Alpha summary.',
+          summaryType: 'fallback',
+          domain: 'alpha.com',
+        },
+        {
+          url: 'https://zeta.com/page',
+          title: 'Zeta Page',
+          favicon: '',
+          timestamp: Date.now(),
+          summary: 'Zeta summary.',
+          summaryType: 'fallback',
+          domain: 'zeta.com',
+        },
+      ],
+      stats: { tabsTidiedThisWeek: 2, ramSavedEstimate: 100 },
     });
 
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
+    await expect(page.locator('.group-title').first()).toBeVisible({ timeout: 5000 });
 
     // Default sort is recency — zeta.com should be first (newest)
-    const firstGroupRecency = await page.locator('.group-title').first().textContent();
-    expect(firstGroupRecency).toBe('ZETA.COM');
+    await expect(page.locator('.group-title').first()).toHaveText('ZETA.COM');
 
     // Switch to domain sort
     await page.locator('#sort-select').selectOption('domain');
-    await page.waitForTimeout(500);
-
-    // Alpha should be first alphabetically
-    const firstGroupDomain = await page.locator('.group-title').first().textContent();
-    expect(firstGroupDomain).toBe('ALPHA.COM');
+    await expect(page.locator('.group-title').first()).toContainText('ALPHA.COM');
   });
 });
 
 test.describe('Digest — Stats Display', () => {
   test('stats section displays correct values', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      const items = [];
-      for (let i = 0; i < 12; i++) {
-        items.push({
-          url: `https://d${i}.com/p`,
-          title: `Page ${i}`,
-          favicon: '',
-          timestamp: Date.now() - i * 1000,
-          summary: 'S',
-          summaryType: 'fallback',
-          domain: `d${i}.com`,
-        });
-      }
-      await chrome.storage.local.set({
-        config: { enableAI: true },
-        archived: items,
-        stats: { tabsTidiedThisWeek: 12, ramSavedEstimate: 600 },
+    const page = await context.newPage();
+    const items = [];
+    for (let i = 0; i < 12; i++) {
+      items.push({
+        url: `https://d${i}.com/p`,
+        title: `Page ${i}`,
+        favicon: '',
+        timestamp: Date.now() - i * 1000,
+        summary: 'S',
+        summaryType: 'fallback',
+        domain: `d${i}.com`,
       });
+    }
+    await seedAndReload(page, extensionId, {
+      config: { enableAI: true },
+      archived: items,
+      stats: { tabsTidiedThisWeek: 12, ramSavedEstimate: 600 },
     });
 
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
+    await expect(page.locator('#total-archived')).toHaveText('12', { timeout: 5000 });
 
     // Wait for async topic extraction to complete (badge appears)
     await page.waitForSelector('#topics-badge:not([hidden])', { timeout: 3000 }).catch(() => {});
 
-    const totalArchived = await page.locator('#total-archived').textContent();
-    expect(totalArchived).toBe('12');
-
-    const ramSaved = await page.locator('#ram-saved').textContent();
-    expect(ramSaved).toBe('600 MB');
-
-    const topics = await page.locator('#topics-explored').textContent();
-    expect(topics).toBe('12'); // 12 unique domains (AI unavailable — fallback)
-
-    // Badge should show 'sites' fallback since AI is unavailable in tests
-    const badge = page.locator('#topics-badge');
-    await expect(badge).toContainText('sites');
+    expect(await page.locator('#ram-saved').textContent()).toBe('600 MB');
+    expect(await page.locator('#topics-explored').textContent()).toBe('12');
+    await expect(page.locator('#topics-badge')).toContainText('sites');
   });
 
   test('date header shows current date', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const dateText = await page.locator('#digest-date').textContent();
-    // Should contain the year
-    expect(dateText).toContain('2026');
-  });
-
-  test('donation footer displays topic count', async ({ context, extensionId }) => {
-    const seedPage = await context.newPage();
-    await seedPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
-    await seedPage.evaluate(async () => {
-      await chrome.storage.local.set({
-        archived: [
-          { url: 'https://a.com/p', title: 'A', favicon: '', timestamp: Date.now(), summary: 'S', summaryType: 'fallback', domain: 'a.com' },
-          { url: 'https://b.com/p', title: 'B', favicon: '', timestamp: Date.now(), summary: 'S', summaryType: 'fallback', domain: 'b.com' },
-          { url: 'https://c.com/p', title: 'C', favicon: '', timestamp: Date.now(), summary: 'S', summaryType: 'fallback', domain: 'c.com' },
-        ],
-        stats: { tabsTidiedThisWeek: 3, ramSavedEstimate: 150 },
-      });
-    });
-
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
-
-    // Wait for async topic extraction to complete
-    await page.waitForSelector('#topics-badge:not([hidden])', { timeout: 3000 }).catch(() => {});
-
-    const footerCount = await page.locator('#footer-topics-count').textContent();
-    expect(footerCount).toBe('3'); // 3 unique domains (AI unavailable — fallback)
+    // Should contain the current year
+    expect(dateText).toContain(String(new Date().getFullYear()));
   });
 });
 
@@ -410,7 +285,6 @@ test.describe('Digest — Accessibility', () => {
   test('feed has correct aria role and label', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const feed = page.locator('#archive-feed');
     expect(await feed.getAttribute('role')).toBe('feed');
@@ -428,7 +302,6 @@ test.describe('Digest — Accessibility', () => {
   test('theme sort option is initially disabled (no window.ai)', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const themeOption = page.locator('#sort-theme-option');
     await expect(themeOption).toBeDisabled();

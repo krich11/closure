@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Service Worker (background.js)
- * @version 1.8.2
+ * @version 2.0.0
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -14,7 +14,8 @@ const DEFAULT_CONFIG = {
   idleThresholdHours: 24,
   whitelist: [],
   enableAI: false,
-  aiLicenseKey: '',
+  aiSupporterCode: '',
+  aiActivated: false,          // true once a valid supporter code has been entered (grandfathers past codes)
   enableThematicClustering: false,
   enableRichPageAnalysis: false,
   enableTopicGrouping: false,

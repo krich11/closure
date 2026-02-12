@@ -17,14 +17,15 @@ test.describe('Zen Popup', () => {
     expect(health).toBe('green');
   });
 
-  test('archive button is present and clickable', async ({ context, extensionId }) => {
+  test('support link points to ko-fi', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
-    const btn = page.locator('#archive-now');
-    await expect(btn).toBeVisible();
-    await expect(btn).toBeEnabled();
-    expect(await btn.textContent()).toContain('Archive Idle Tabs Now');
+    const link = page.locator('#support-link');
+    await expect(link).toBeVisible();
+    expect(await link.textContent()).toBe('Support me to enable AI features');
+    expect(await link.getAttribute('href')).toContain('ko-fi.com/krich11');
+    expect(await link.getAttribute('rel')).toContain('noopener');
   });
 
   test('stats section is visible', async ({ context, extensionId }) => {

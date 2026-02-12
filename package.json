@@ -1,6 +1,6 @@
 {
   "name": "closure",
-  "version": "1.8.2",
+  "version": "2.0.0",
   "description": "Tab-Shame Absolution Engine — a privacy-first Chromium extension",
   "main": "background.js",
   "scripts": {
@@ -9,7 +9,7 @@
     "test": "npx playwright test",
     "test:all": "npx playwright test --config=playwright.all.config.js",
     "test:slow": "npx playwright test --config=playwright.all.config.js --grep @slow",
-    "test:headed": "npx playwright test --headed",
+    "test:headed": "HEADED=1 npx playwright test",
     "test:debug": "npx playwright test --debug",
     "test:report": "npx playwright show-report"
   },

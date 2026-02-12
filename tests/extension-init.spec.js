@@ -49,10 +49,10 @@ test.describe('Extension Initialization', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
-    // Archive button is a proper <button>
-    const archiveBtn = page.locator('#archive-now');
-    await expect(archiveBtn).toBeVisible();
-    expect(await archiveBtn.evaluate((el) => el.tagName)).toBe('BUTTON');
+    // Support link is a proper <a>
+    const supportLink = page.locator('#support-link');
+    await expect(supportLink).toBeVisible();
+    expect(await supportLink.evaluate((el) => el.tagName)).toBe('A');
 
     // Status ring has aria-live for screen readers
     const ring = page.locator('#status-ring');

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Dead End Sweeper Tests
- * @version 1.8.2
+ * @version 2.0.0
  *
  * Verifies that the Dead End Sweeper correctly detects error pages,
  * logs them to storage, closes them, and updates the badge.
@@ -59,7 +59,10 @@ test.describe('Dead End Sweeper', () => {
     // Chrome alarms have a minimum of ~30 seconds in production, but in tests
     // we need to check the result differently
     // Instead, let's verify the title check function logic via storage
-    await page.waitForTimeout(2000);
+    await expect(async () => {
+      const alarm = await page.evaluate(async () => chrome.alarms.get('dead-end-sweeper'));
+      expect(alarm).toBeTruthy();
+    }).toPass({ timeout: 5000 });
 
     // Check if the tab was swept (should appear in storage)
     const sweptData = await page.evaluate(async () => {

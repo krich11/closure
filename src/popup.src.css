@@ -40,37 +40,6 @@
     @apply text-sm text-ink-secondary m-0;
   }
 
-  /* Archive Button */
-  .btn-archive {
-    @apply w-full py-2.5 px-4 bg-warm text-white border-none rounded font-sans text-sm font-medium cursor-pointer;
-    transition: background-color 0.2s ease, opacity 0.2s ease;
-  }
-
-  .btn-archive:hover {
-    @apply bg-warm-hover;
-  }
-
-  .btn-archive:disabled {
-    @apply opacity-60 cursor-not-allowed;
-  }
-
-  /* Cluster Button */
-  .btn-cluster {
-    @apply w-full py-2 px-4 border rounded font-sans text-sm font-medium cursor-pointer mt-2;
-    background: transparent;
-    color: var(--color-warm);
-    border-color: var(--color-warm);
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-
-  .btn-cluster:hover {
-    @apply bg-warm text-white;
-  }
-
-  .btn-cluster:disabled {
-    @apply opacity-60 cursor-not-allowed;
-  }
-
   /* Stats */
   .stats-section p {
     @apply my-0.5 text-xs text-ink-muted;
@@ -98,22 +67,15 @@
     text-underline-offset: 3px;
   }
 
-  /* Nuclear Toast */
-  .nuclear-toast {
-    @apply w-full mt-2 p-3 bg-card border border-border rounded-lg text-center;
-    animation: toast-fade-in 0.3s ease;
+  /* Support Link */
+  .support-link {
+    @apply text-xs text-ink-muted no-underline cursor-pointer mt-1;
+    transition: color 0.2s;
   }
 
-  .nuclear-toast p {
-    @apply m-0 mb-1 text-sm text-ink;
-  }
-
-  .nuclear-toast .toast-donate {
-    @apply text-xs text-ink-muted;
-  }
-
-  .nuclear-toast .toast-link {
-    @apply inline-block mt-1.5 text-xs text-warm underline;
+  .support-link:hover {
+    @apply text-warm underline;
+    text-underline-offset: 3px;
   }
 }
 

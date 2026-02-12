@@ -13,7 +13,7 @@ module.exports = defineConfig({
   testDir: './tests',
   timeout: 60_000,
   retries: 0,
-  workers: 1, // Extensions share browser state; parallelism causes flakiness
+  workers: 8, // Each worker launches its own isolated Chromium instance
   reporter: [['list'], ['html', { open: 'never' }]],
 
   // Skip @slow-tagged tests by default (alarm-bound, 30-47s each).

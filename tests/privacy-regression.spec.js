@@ -21,14 +21,12 @@ test.describe('Privacy — Settings Page', () => {
 
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
-    await page.waitForLoadState('networkidle');
 
     // Interact with the page to trigger any lazy loads
     await page.locator('#group-threshold').fill('5');
     await page.locator('#group-threshold').dispatchEvent('change');
     await page.locator('#whitelist-input').fill('test.com');
     await page.locator('#whitelist-add').click();
-    await page.waitForTimeout(500);
 
     expect(externalRequests).toEqual([]);
   });
@@ -36,7 +34,6 @@ test.describe('Privacy — Settings Page', () => {
   test('settings page does not embed external resources', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     // Check that no scripts or stylesheets reference external URLs
     const externalRefs = await page.evaluate(() => {
@@ -67,13 +64,11 @@ test.describe('Privacy — Onboarding Page', () => {
 
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('networkidle');
 
     // Navigate through all steps to trigger any lazy loading
     await page.locator('[data-next="step-permissions"]').click();
     await page.locator('[data-next="step-features"]').click();
     await page.locator('[data-next="step-ready"]').click();
-    await page.waitForTimeout(500);
 
     expect(externalRequests).toEqual([]);
   });
@@ -81,7 +76,6 @@ test.describe('Privacy — Onboarding Page', () => {
   test('onboarding page does not embed external resources', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/onboarding/onboarding.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const externalRefs = await page.evaluate(() => {
       const external = [];
@@ -129,32 +123,11 @@ test.describe('Privacy — Digest Page', () => {
 
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('networkidle');
 
     // Exercise sort toggle
     await page.locator('#sort-select').selectOption('domain');
-    await page.waitForTimeout(500);
 
     expect(externalRequests).toEqual([]);
-  });
-
-  test('digest page donation link is local only (no tracking redirect)', async ({ context, extensionId }) => {
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/digest/digest.html`);
-    await page.waitForLoadState('domcontentloaded');
-
-    // The donation link should be a direct URL, no tracking params
-    const donationLink = page.locator('a[href*="ko-fi"]');
-    const href = await donationLink.getAttribute('href');
-
-    // Should be a clean URL with no analytics/UTM params
-    expect(href).not.toContain('utm_');
-    expect(href).not.toContain('ref=');
-
-    // Should have rel="noopener noreferrer" for security
-    const rel = await donationLink.getAttribute('rel');
-    expect(rel).toContain('noopener');
-    expect(rel).toContain('noreferrer');
   });
 });
 

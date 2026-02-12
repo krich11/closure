@@ -23,8 +23,7 @@ test.describe('Graceful Exit — Idle Tab Archival Integration', () => {
 
     // Create a tab to archive
     const targetTab = await context.newPage();
-    await targetTab.goto('https://example.com/idle-article');
-    await targetTab.waitForLoadState('domcontentloaded');
+    await targetTab.goto('https://example.com/idle-article', { waitUntil: 'commit' });
 
     // Get the tab's ID
     const tabId = await page.evaluate(async () => {
@@ -98,24 +97,18 @@ test.describe('Graceful Exit — Idle Tab Archival Integration', () => {
     expect(tabExists).toBe(false);
   });
 
-  test('nuclear archive via popup sends message and gets response', async ({ context, extensionId }) => {
+  test('nuclear archive message gets response', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
-    // Click the archive button
-    await page.locator('#archive-now').click();
+    // Send the nuclear archive message directly (button removed from popup)
+    const response = await page.evaluate(async () => {
+      return chrome.runtime.sendMessage({ action: 'nuclearArchive' });
+    });
 
-    // Wait for the button to update
-    await page.waitForTimeout(1000);
-
-    const btnText = await page.locator('#archive-now').textContent();
-    // Should show one of the post-click states
-    expect(
-      btnText === 'Archiving...' ||
-      btnText === 'No idle tabs found' ||
-      btnText.includes('Archived') ||
-      btnText.includes('Archive Idle Tabs Now')
-    ).toBe(true);
+    // Should get a valid response with count
+    expect(response).toBeTruthy();
+    expect(typeof response.count).toBe('number');
   });
 
   test('archival preserves summary with correct summaryType', async ({ context, extensionId }) => {
@@ -201,8 +194,7 @@ test.describe('Graceful Exit — Idle Tab Archival Integration', () => {
 
     // Create and pin a tab
     const pinnedTab = await context.newPage();
-    await pinnedTab.goto('https://example.com/pinned-protect');
-    await pinnedTab.waitForLoadState('domcontentloaded');
+    await pinnedTab.goto('https://example.com/pinned-protect', { waitUntil: 'commit' });
 
     await page.evaluate(async () => {
       const tabs = await chrome.tabs.query({});
