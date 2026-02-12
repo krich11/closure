@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Closure</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; line-height: 1.7; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.15rem; margin-top: 2rem; }
+    .updated { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+    .tldr { background: #f0f7f0; border-left: 4px solid #2d8a4e; padding: 1rem 1.25rem; border-radius: 4px; margin-bottom: 2rem; }
+    .tldr strong { display: block; margin-bottom: 0.25rem; }
+    ul { padding-left: 1.25rem; }
+    li { margin-bottom: 0.5rem; }
+    a { color: #2d6da3; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; font-size: 0.85rem; color: #666; }
+  </style>
+</head>
+<body>
+
+<h1>Privacy Policy</h1>
+<p class="updated">Last updated: February 11, 2026</p>
+
+<div class="tldr">
+  <strong>TL;DR</strong>
+  Closure does not collect, transmit, or share any data. Everything stays on your device. There are no servers, no analytics, no tracking, and no exceptions.
+</div>
+
+<h2>What Closure Does</h2>
+<p>Closure is a browser extension that organizes your tabs — grouping them by domain, detecting broken pages, and archiving idle tabs with optional AI-generated summaries. That's it.</p>
+
+<h2>Data Collection</h2>
+<p>Closure collects <strong>nothing</strong>. Specifically:</p>
+<ul>
+  <li>No personal information is collected.</li>
+  <li>No browsing history is collected.</li>
+  <li>No analytics or telemetry of any kind.</li>
+  <li>No cookies, fingerprinting, or tracking.</li>
+  <li>No user accounts or sign-ins.</li>
+</ul>
+
+<h2>Data Storage</h2>
+<p>Closure stores data locally on your device using Chrome's built-in <code>chrome.storage.local</code> API. This data never leaves your machine. It includes:</p>
+<ul>
+  <li><strong>Settings</strong> — your configuration preferences (group threshold, idle timeout, whitelist, etc.).</li>
+  <li><strong>Archived tabs</strong> — the URL, title, favicon, and an AI-generated or fallback summary of tabs that were archived.</li>
+  <li><strong>Swept tab log</strong> — a record of broken/error tabs that were closed, for your reference.</li>
+  <li><strong>Statistics</strong> — a simple count of tabs tidied and estimated RAM saved.</li>
+</ul>
+<p>You can view and delete all stored data from the Settings page at any time.</p>
+
+<h2>Network Requests</h2>
+<p>Closure makes <strong>zero network requests</strong>. No data is sent to any server, API, or third party. The extension does not contain any code that communicates over the network. This is verified by automated tests that monitor all network activity from every extension page.</p>
+
+<h2>AI Processing</h2>
+<p>When enabled, AI-powered features (tab summaries, topic grouping) use Chrome's built-in on-device Gemini Nano model. All processing happens locally on your hardware. No text, URLs, or page content is sent anywhere.</p>
+
+<h2>Permissions</h2>
+<p>Closure requests the following browser permissions, each for a specific purpose:</p>
+<ul>
+  <li><strong>tabs</strong> — to read tab URLs and titles for grouping, sweeping, and archival.</li>
+  <li><strong>tabGroups</strong> — to create, name, and color tab groups.</li>
+  <li><strong>storage</strong> — to save your settings and archived tab data locally.</li>
+  <li><strong>alarms</strong> — to schedule periodic checks (sweeping, idle detection).</li>
+  <li><strong>notifications</strong> — to alert you before a tab is archived ("Stay of Execution").</li>
+  <li><strong>offscreen</strong> — to run the on-device AI model in a background document.</li>
+  <li><strong>scripting</strong> (optional) — to read page content for more accurate AI summaries. Only requested when you enable "Rich Page Analysis."</li>
+</ul>
+
+<h2>Third Parties</h2>
+<p>There are no third parties. No SDKs, no libraries that phone home, no embedded content, no remote resources. The extension is entirely self-contained.</p>
+
+<h2>Monetization</h2>
+<p>Closure is free. There are no ads, no paid tiers, no in-app purchases. The extension includes optional donation links to <a href="https://ko-fi.com/s/28c3a8d852">Ko-fi</a> — these are clearly labeled and never block functionality.</p>
+
+<h2>Children's Privacy</h2>
+<p>Closure does not collect data from anyone, including children.</p>
+
+<h2>Changes to This Policy</h2>
+<p>If this policy changes, the updated version will be published here. Since there's no data to collect, it's unlikely to change much.</p>
+
+<h2>Contact</h2>
+<p>Questions? Open an issue at <a href="https://github.com/krich11/closure/issues">github.com/krich11/closure</a>.</p>
+
+<footer>
+  <p>Closure — 100% local, 100% private. The developer has better things to do than collect your data.</p>
+</footer>
+
+</body>
+</html>

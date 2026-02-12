@@ -5,6 +5,7 @@
   "main": "background.js",
   "scripts": {
     "build:css": "npx @tailwindcss/cli -i src/popup.src.css -o popup/popup.css --minify && npx @tailwindcss/cli -i src/digest.src.css -o digest/digest.css --minify && npx @tailwindcss/cli -i src/settings.src.css -o settings/settings.css --minify && npx @tailwindcss/cli -i src/onboarding.src.css -o onboarding/onboarding.css --minify",
+    "build:zip": "node scripts/build-zip.js",
     "version:sync": "node scripts/sync-version.js",
     "test": "npx playwright test",
     "test:all": "npx playwright test --config=playwright.all.config.js",

@@ -2,7 +2,10 @@
   "manifest_version": 3,
   "name": "Closure",
   "version": "2.0.2",
+  "version_name": "2.0.2",
   "description": "Tab-Shame Absolution Engine — tidy tabs, archive with local AI, reclaim your focus.",
+  "homepage_url": "https://github.com/krich11/closure",
+  "minimum_chrome_version": "89",
   "permissions": [
     "tabs",
     "tabGroups",

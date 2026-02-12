@@ -4,3 +4,6 @@ playwright-report/
 blob-report/
 .DS_Store
 activation-key.txt
+closure-v*.zip
+store/screenshots/
+store/promo-*.png
