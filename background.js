@@ -122,7 +122,7 @@ const TITLE_ERROR_PATTERNS = [
   /\b500\b/i,
   /\b502\b/i,
   /\b503\b/i,
-  /timed?\s*out/i,
+  /\btimed?\s+out\b/i,
   /site\s+can'?t\s+be\s+reached/i,
   /ERR_/i,
   /DNS_PROBE/i,
