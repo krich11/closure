@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 2.0.1
+ * @version 2.0.2
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.
@@ -142,7 +142,6 @@ let aiActivatedFlag = false;
  * Then add the resulting hash to this array.
  */
 const VALID_CODE_HASHES = [
-  // CLOSURE-SUPPORTER-2026
   '913e13aa306177e8c0bb6302571ef7a9739803857d07337f9e66b345f463df21',
 ];
 
@@ -181,10 +180,7 @@ async function initAiMasterToggle(enabled, storedKey, alreadyActivated) {
   const errorEl = document.getElementById('ai-license-error');
   if (!btn) return;
 
-  // Pre-fill the stored code (masked display)
-  if (storedKey && inputEl) {
-    inputEl.value = storedKey;
-  }
+  // Don't pre-fill the code — it's not stored after activation
 
   btn.setAttribute('aria-checked', String(!!enabled));
   applyAiDisabledState(!enabled);
@@ -399,7 +395,7 @@ async function saveConfig() {
     archiveRetentionDays: parseInt(document.getElementById('retention-days')?.value, 10) || 0,
     archiveSortBy: document.getElementById('archive-sort')?.value || 'recency',
     enableAI: document.getElementById('enable-ai')?.getAttribute('aria-checked') === 'true',
-    aiSupporterCode: document.getElementById('ai-license-input')?.value?.trim() || '',
+    aiSupporterCode: '',  // never persist the plain-text code
     aiActivated: aiActivatedFlag,
     enableThematicClustering: document.getElementById('enable-clustering')?.getAttribute('aria-checked') === 'true',
     enableRichPageAnalysis: document.getElementById('enable-rich-analysis')?.getAttribute('aria-checked') === 'true',

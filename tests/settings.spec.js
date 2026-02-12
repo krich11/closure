@@ -202,12 +202,14 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
 
-    // Enable AI first (sub-controls are gated behind master toggle)
-    await page.locator('#enable-ai').click();
-    // Enter a supporter code to activate
-    await page.fill('#ai-license-input', 'CLOSURE-SUPPORTER-2026');
-    await page.click('#ai-license-submit');
-    await expect(page.locator('#ai-license-gate')).toBeHidden({ timeout: 5000 });
+    // Pre-seed AI as activated so sub-controls are ungated
+    await page.evaluate(async () => {
+      const { config } = await chrome.storage.local.get('config');
+      config.enableAI = true;
+      config.aiActivated = true;
+      await chrome.storage.local.set({ config });
+    });
+    await page.reload();
 
     const toggle = page.locator('#enable-clustering');
     await expect(toggle).toBeVisible();
@@ -228,11 +230,14 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
 
-    // Enable AI first (topic grouping is AI-gated)
-    await page.locator('#enable-ai').click();
-    await page.fill('#ai-license-input', 'CLOSURE-SUPPORTER-2026');
-    await page.click('#ai-license-submit');
-    await expect(page.locator('#ai-license-gate')).toBeHidden({ timeout: 5000 });
+    // Pre-seed AI as activated so sub-controls are ungated
+    await page.evaluate(async () => {
+      const { config } = await chrome.storage.local.get('config');
+      config.enableAI = true;
+      config.aiActivated = true;
+      await chrome.storage.local.set({ config });
+    });
+    await page.reload();
 
     // Options should be hidden by default
     const options = page.locator('#topic-grouping-options');
@@ -259,11 +264,14 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
 
-    // Enable AI first (topic grouping is AI-gated)
-    await page.locator('#enable-ai').click();
-    await page.fill('#ai-license-input', 'CLOSURE-SUPPORTER-2026');
-    await page.click('#ai-license-submit');
-    await expect(page.locator('#ai-license-gate')).toBeHidden({ timeout: 5000 });
+    // Pre-seed AI as activated so sub-controls are ungated
+    await page.evaluate(async () => {
+      const { config } = await chrome.storage.local.get('config');
+      config.enableAI = true;
+      config.aiActivated = true;
+      await chrome.storage.local.set({ config });
+    });
+    await page.reload();
 
     // Enable topic grouping first so options are visible
     await page.locator('#enable-topic-grouping').click();
@@ -285,11 +293,14 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
 
-    // Enable AI first (topic grouping is AI-gated)
-    await page.locator('#enable-ai').click();
-    await page.fill('#ai-license-input', 'CLOSURE-SUPPORTER-2026');
-    await page.click('#ai-license-submit');
-    await expect(page.locator('#ai-license-gate')).toBeHidden({ timeout: 5000 });
+    // Pre-seed AI as activated so sub-controls are ungated
+    await page.evaluate(async () => {
+      const { config } = await chrome.storage.local.get('config');
+      config.enableAI = true;
+      config.aiActivated = true;
+      await chrome.storage.local.set({ config });
+    });
+    await page.reload();
 
     // Enable topic grouping first
     await page.locator('#enable-topic-grouping').click();
@@ -331,11 +342,14 @@ test.describe('Settings Page — Toggles', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/settings/settings.html`);
 
-    // Enable AI first
-    await page.locator('#enable-ai').click();
-    await page.fill('#ai-license-input', 'CLOSURE-SUPPORTER-2026');
-    await page.click('#ai-license-submit');
-    await expect(page.locator('#ai-license-gate')).toBeHidden({ timeout: 5000 });
+    // Pre-seed AI as activated so sub-controls are ungated
+    await page.evaluate(async () => {
+      const { config } = await chrome.storage.local.get('config');
+      config.enableAI = true;
+      config.aiActivated = true;
+      await chrome.storage.local.set({ config });
+    });
+    await page.reload();
 
     // Enable clustering
     await page.locator('#enable-clustering').click();
