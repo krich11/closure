@@ -1,6 +1,6 @@
 /**
  * Closure — Service Worker (background.js)
- * @version 2.0.2
+ * @version 2.0.3
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -323,10 +323,6 @@ async function evaluateAutoGroup(triggerTab) {
 
     if (ungroupedIds.length > 0) {
       await chrome.tabs.group({ tabIds: ungroupedIds, groupId: existingGroup.id });
-
-      // If tabs were pulled from other windows, focus the destination
-      // window so the user can see where their tab went.
-      await focusGroupWindow(existingGroup.id);
     }
 
     // Move the group to the leftmost position (after pinned tabs)
@@ -345,24 +341,32 @@ async function evaluateAutoGroup(triggerTab) {
     // Move the new group to the leftmost position (after pinned tabs)
     await moveGroupToLeft(groupId);
 
-    // If tabs were pulled from multiple windows, focus the window
-    // that now holds the group so the user sees where they went.
-    await focusGroupWindow(groupId);
-
-    // Collapse after moving — move can reset collapsed state.
-    // Chrome won't collapse a group containing the active tab, so
-    // activate a tab outside the group first if needed.
+    // Collapse to reduce tab strip clutter. If the active tab is
+    // inside, Chrome may silently prevent collapse — that's fine,
+    // the user's focus takes priority over visual tidiness.
     try {
-      const [activeTab] = await chrome.tabs.query({ active: true, windowId: sameDomainTabs[0].windowId });
-      if (activeTab && activeTab.groupId === groupId) {
-        const outsideTab = (await chrome.tabs.query({ windowId: activeTab.windowId }))
-          .find((t) => t.groupId !== groupId && !t.pinned);
-        if (outsideTab) await chrome.tabs.update(outsideTab.id, { active: true });
-      }
       await chrome.tabGroups.update(groupId, { collapsed: true });
     } catch (err) {
       console.debug('[Closure] collapse after group creation error:', err.message);
     }
+  }
+
+  // After all grouping operations, bring the trigger tab into focus.
+  // This ensures the user always sees the tab they were interacting
+  // with, even after cross-window pulls, group moves, or collapses.
+  // Activating a tab inside a collapsed group auto-expands it in Chrome.
+  try {
+    const freshTab = await chrome.tabs.get(triggerTab.id);
+    await chrome.windows.update(freshTab.windowId, { focused: true });
+    await chrome.tabs.update(triggerTab.id, { active: true });
+
+    // Accordion behavior: collapse all OTHER groups in this window
+    // so only the active group is expanded, keeping the tab strip tidy.
+    if (freshTab.groupId !== -1) {
+      await collapseOtherGroups(freshTab.windowId, freshTab.groupId);
+    }
+  } catch (err) {
+    console.debug('[Closure] Re-focus trigger tab error:', err.message);
   }
 }
 
@@ -410,6 +414,30 @@ async function focusGroupWindow(groupId) {
     await chrome.tabs.update(sorted[0].id, { active: true });
   } catch (err) {
     console.debug('[Closure] focusGroupWindow error:', err.message);
+  }
+}
+
+/**
+ * Collapse all tab groups in a window EXCEPT the specified one.
+ * Creates an accordion effect — only the active group stays expanded.
+ *
+ * @param {number} windowId - Window to operate in
+ * @param {number} exceptGroupId - Group to leave expanded
+ */
+async function collapseOtherGroups(windowId, exceptGroupId) {
+  try {
+    const allGroups = await chrome.tabGroups.query({ windowId });
+    for (const group of allGroups) {
+      if (group.id !== exceptGroupId && !group.collapsed) {
+        try {
+          await chrome.tabGroups.update(group.id, { collapsed: true });
+        } catch {
+          // Group may have been removed — that's fine
+        }
+      }
+    }
+  } catch (err) {
+    console.debug('[Closure] collapseOtherGroups error:', err.message);
   }
 }
 
