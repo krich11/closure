@@ -24,7 +24,7 @@ test.describe('Zen Popup', () => {
     const link = page.locator('#support-link');
     await expect(link).toBeVisible();
     expect(await link.textContent()).toBe('Support me to enable AI features');
-    expect(await link.getAttribute('href')).toContain('ko-fi.com/krich11');
+    expect(await link.getAttribute('href')).toContain('ko-fi.com/s/28c3a8d852');
     expect(await link.getAttribute('rel')).toContain('noopener');
   });
 

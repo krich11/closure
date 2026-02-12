@@ -186,7 +186,7 @@ Always migrate data forward when bumping `schema_version`.
 
 ## Donation Integration
 
-- Donation links point to a configurable URL (default: `https://ko-fi.com/krich11`).
+- Donation links point to a configurable URL (default: `https://ko-fi.com/s/28c3a8d852`).
 - Never block features behind donation. Never nag.
 - Donation prompts appear only:
   1. Bottom of Sunday Digest.
