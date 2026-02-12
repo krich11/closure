@@ -64,8 +64,6 @@ All core features are free and always will be. AI-powered features (summaries, t
 
 - [ ] Respect manual ungroup — when a user manually ungroups a tab group, suppress re-grouping for that domain (cooldown or until browser restart) so Closure doesn't fight the user's intent
 - [ ] Vertical tabs tip in settings — link users to `chrome://flags/#vertical-tabs` (Chrome 145+, no extension API available)
-- [ ] Chrome Web Store listing
-- [ ] Icon design (16, 48, 128 px)
 
 ## License
 
