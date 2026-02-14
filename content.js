@@ -1,6 +1,6 @@
 /**
  * Closure — Content Script (content.js)
- * @version 2.0.4
+ * @version 2.0.5
  *
  * Injected on-demand via chrome.scripting.executeScript ONLY when
  * the user opts in to "Rich Page Analysis" in Settings. This grants

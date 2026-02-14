@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Settings page (settings.js)
- * @version 2.0.4
+ * @version 2.0.5
  *
  * Loads config from chrome.storage.local, binds controls,
  * auto-saves on change. No network calls.

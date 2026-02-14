@@ -1,6 +1,6 @@
 /**
  * Closure — Service Worker (background.js)
- * @version 2.0.4
+ * @version 2.0.5
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -1366,6 +1366,26 @@ chrome.notifications.onButtonClicked.addListener((notifId, buttonIndex) => {
 // Auto-dismiss stay-of-execution notifications when closed without clicking buttons
 chrome.notifications.onClosed.addListener((notifId, byUser) => {
   // If user dismissed without choosing → tab proceeds to archival (no action needed)
+});
+
+// ─── Accordion on Tab Switch ────────────────────────────────────
+// When the user switches to a tab, collapse every group except the
+// one the active tab belongs to. If the tab isn't in a group,
+// collapse ALL groups. This keeps the tab strip compact at all times.
+
+chrome.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.groupId !== -1) {
+      await collapseOtherGroups(tab.windowId, tab.groupId);
+    } else {
+      // Tab is ungrouped — collapse everything
+      await collapseOtherGroups(tab.windowId, -1);
+    }
+  } catch (err) {
+    // Tab may have been closed between activation and lookup
+    console.debug('[Closure] Accordion on tab switch error:', err.message);
+  }
 });
 
 // ─── Single-Tab Ungroup ─────────────────────────────────────────
