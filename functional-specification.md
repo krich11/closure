@@ -6,7 +6,7 @@ Here is the revised functional specification (Version 1.1.0) with incorporated f
 
 # Functional Description Document: The "Tab-Shame" Absolution Engine
 
-**Version:** 2.0.3  
+**Version:** 2.0.4  
 **Date:** February 9, 2026  
 **Confidentiality:** Internal Use Only  
 **Changes from 1.0.0:** Added configurability, improved error detection, refined AI handling and prompts, optional thematic clustering, single-tab restore, permission onboarding flow, edge-case coverage, accessibility requirements, and one additional donation trigger.

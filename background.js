@@ -1,6 +1,6 @@
 /**
  * Closure — Service Worker (background.js)
- * @version 2.0.3
+ * @version 2.0.4
  *
  * Manages tab grouping (Clean Slate Automator), error sweeping,
  * archival orchestration, and alarm scheduling.
@@ -298,6 +298,12 @@ async function evaluateAutoGroup(triggerTab) {
   const hostname = getHostname(triggerTab.url);
   if (hostname && await isDomainWhitelisted(hostname)) return;
 
+  // Snapshot whether the trigger tab is currently the active/focused tab.
+  // If it is, we'll restore focus after grouping. If not, this is a
+  // background operation (timed event, AI clustering, etc.) and we must
+  // not steal focus from whatever the user is looking at.
+  const wasActive = triggerTab.active;
+
   const { config } = await chrome.storage.local.get('config');
   const threshold = config?.groupThreshold ?? DEFAULT_CONFIG.groupThreshold;
   const perWindow = config?.perWindowGrouping ?? DEFAULT_CONFIG.perWindowGrouping;
@@ -325,8 +331,8 @@ async function evaluateAutoGroup(triggerTab) {
       await chrome.tabs.group({ tabIds: ungroupedIds, groupId: existingGroup.id });
     }
 
-    // Move the group to the leftmost position (after pinned tabs)
-    await moveGroupToLeft(existingGroup.id);
+    // Move the group into the group zone (after existing groups)
+    await moveGroupToGroupZone(existingGroup.id);
   } else {
     // Create a new group from all same-domain tabs
     const tabIds = sameDomainTabs.map((t) => t.id);
@@ -338,8 +344,8 @@ async function evaluateAutoGroup(triggerTab) {
       color: GROUP_COLORS[colorIndex],
     });
 
-    // Move the new group to the leftmost position (after pinned tabs)
-    await moveGroupToLeft(groupId);
+    // Move the new group into the group zone (after existing groups)
+    await moveGroupToGroupZone(groupId);
 
     // Collapse to reduce tab strip clutter. If the active tab is
     // inside, Chrome may silently prevent collapse — that's fine,
@@ -351,45 +357,59 @@ async function evaluateAutoGroup(triggerTab) {
     }
   }
 
-  // After all grouping operations, bring the trigger tab into focus.
-  // This ensures the user always sees the tab they were interacting
-  // with, even after cross-window pulls, group moves, or collapses.
-  // Activating a tab inside a collapsed group auto-expands it in Chrome.
-  try {
-    const freshTab = await chrome.tabs.get(triggerTab.id);
-    await chrome.windows.update(freshTab.windowId, { focused: true });
-    await chrome.tabs.update(triggerTab.id, { active: true });
+  // Only restore focus if the trigger tab was already the active tab.
+  // This prevents background operations (AI topic grouping, timed sweeps,
+  // tabs loading in the background) from stealing focus away from the
+  // tab the user is currently viewing.
+  if (wasActive) {
+    try {
+      const freshTab = await chrome.tabs.get(triggerTab.id);
+      await chrome.windows.update(freshTab.windowId, { focused: true });
+      await chrome.tabs.update(triggerTab.id, { active: true });
 
-    // Accordion behavior: collapse all OTHER groups in this window
-    // so only the active group is expanded, keeping the tab strip tidy.
-    if (freshTab.groupId !== -1) {
-      await collapseOtherGroups(freshTab.windowId, freshTab.groupId);
+      // Accordion behavior: collapse all OTHER groups in this window
+      // so only the active group is expanded, keeping the tab strip tidy.
+      if (freshTab.groupId !== -1) {
+        await collapseOtherGroups(freshTab.windowId, freshTab.groupId);
+      }
+    } catch (err) {
+      console.debug('[Closure] Re-focus trigger tab error:', err.message);
     }
-  } catch (err) {
-    console.debug('[Closure] Re-focus trigger tab error:', err.message);
   }
 }
 
 /**
- * Move a tab group to the leftmost position in its window, right after
- * any pinned tabs. This keeps all groups clustered on the left side of
- * the tab strip with ungrouped tabs to the right.
+ * Move a tab group into the group zone — the region after pinned tabs
+ * and after all existing groups. New groups land on the RIGHT side of
+ * existing groups so the tab strip reads like a timeline (oldest groups
+ * on the left, newest on the right, ungrouped tabs after).
  *
  * @param {number} groupId
  */
-async function moveGroupToLeft(groupId) {
+async function moveGroupToGroupZone(groupId) {
   try {
     const groupTabs = await chrome.tabs.query({ groupId });
     if (groupTabs.length === 0) return;
 
     const windowId = groupTabs[0].windowId;
-    const pinnedTabs = await chrome.tabs.query({ windowId, pinned: true });
-    const targetIndex = pinnedTabs.length; // first position after pinned tabs
+    const allTabs = await chrome.tabs.query({ windowId });
+
+    // Find the last tab that belongs to ANY group (other than ours)
+    // or is pinned. The new group goes right after that.
+    let lastGroupedIndex = -1;
+    for (const tab of allTabs) {
+      if (tab.pinned || (tab.groupId !== -1 && tab.groupId !== groupId)) {
+        lastGroupedIndex = Math.max(lastGroupedIndex, tab.index);
+      }
+    }
+
+    // Position after the last grouped/pinned tab, or at index 0 if none
+    const targetIndex = lastGroupedIndex + 1;
 
     await chrome.tabGroups.move(groupId, { index: targetIndex });
   } catch (err) {
     // Group may have been removed between query and move — that's fine
-    console.debug('[Closure] moveGroupToLeft error:', err.message);
+    console.debug('[Closure] moveGroupToGroupZone error:', err.message);
   }
 }
 
@@ -623,7 +643,7 @@ async function runTopicGrouping({ manual = false } = {}) {
         color: GROUP_COLORS[colorIndex],
         collapsed: true,
       });
-      await moveGroupToLeft(groupId);
+      await moveGroupToGroupZone(groupId);
       console.debug(`[Closure:TopicGroup] Created group "${cluster.title.toUpperCase()}" with ${validIds.length} tabs (color: ${GROUP_COLORS[colorIndex]})`);
     } catch (err) {
       console.error('[Closure:TopicGroup] Group creation error:', err);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Closure — Dead End Sweeper Tests
- * @version 2.0.3
+ * @version 2.0.4
  *
  * Verifies that the Dead End Sweeper correctly detects error pages,
  * logs them to storage, closes them, and updates the badge.
@@ -46,31 +46,25 @@ test.describe('Dead End Sweeper', () => {
     });
     expect(errorTabId).toBeTruthy();
 
-    // Manually trigger the sweep via the background by sending a message
-    // or by directly calling the alarm handler
-    await page.evaluate(async () => {
-      // Trigger the alarm manually to run the sweep
-      // We simulate this by dispatching the alarm
-      await chrome.alarms.clear('dead-end-sweeper');
-      await chrome.alarms.create('dead-end-sweeper', { delayInMinutes: 0.01, periodInMinutes: 60 });
+    // Trigger the sweep directly via the extension's message handler
+    // instead of creating a short-delay alarm (which would persist
+    // across tests and sweep about:blank tabs in later tests).
+    const sweepResult = await page.evaluate(async () => {
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: 'runSweep' }, (resp) => {
+          resolve(resp);
+        });
+      });
     });
 
-    // Wait for the sweep to process — the alarm fires after ~0.6 seconds minimum
-    // Chrome alarms have a minimum of ~30 seconds in production, but in tests
-    // we need to check the result differently
-    // Instead, let's verify the title check function logic via storage
-    await expect(async () => {
-      const alarm = await page.evaluate(async () => chrome.alarms.get('dead-end-sweeper'));
-      expect(alarm).toBeTruthy();
-    }).toPass({ timeout: 5000 });
+    // The sweep ran — check if the error tab was found
+    expect(sweepResult).toBeDefined();
 
     // Check if the tab was swept (should appear in storage)
     const sweptData = await page.evaluate(async () => {
       return chrome.storage.local.get('swept');
     });
 
-    // The sweep may or may not have fired depending on alarm timing
-    // Let's verify the swept array structure at minimum
     expect(sweptData.swept).toBeDefined();
     expect(Array.isArray(sweptData.swept)).toBe(true);
   });
@@ -117,14 +111,15 @@ test.describe('Dead End Sweeper', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`);
 
-    // Create a tab and pin it
+    // Create a tab at an extension URL (not about:blank, which the sweeper
+    // would close as a "blank/new tab" if it fires concurrently).
     const pinnedPage = await context.newPage();
-    await pinnedPage.goto('about:blank');
+    await pinnedPage.goto(`chrome-extension://${extensionId}/offscreen/offscreen.html`);
     await pinnedPage.evaluate(() => {
       document.title = '500 Internal Server Error';
     });
 
-    // Pin it
+    // Pin it and wait for the pin to register
     await page.evaluate(async () => {
       const tabs = await chrome.tabs.query({});
       const errTab = tabs.find((t) => t.title === '500 Internal Server Error');
@@ -133,12 +128,14 @@ test.describe('Dead End Sweeper', () => {
       }
     });
 
-    // Verify it's pinned
-    const isPinned = await page.evaluate(async () => {
-      const tabs = await chrome.tabs.query({ pinned: true });
-      return tabs.some((t) => t.title === '500 Internal Server Error');
-    });
-    expect(isPinned).toBe(true);
+    // Verify it's pinned (with retry for timing)
+    await expect(async () => {
+      const isPinned = await page.evaluate(async () => {
+        const tabs = await chrome.tabs.query({ pinned: true });
+        return tabs.some((t) => t.title === '500 Internal Server Error');
+      });
+      expect(isPinned).toBe(true);
+    }).toPass({ timeout: 3000 });
 
     // The pinned error tab should NOT be swept — verify it's still open
     const stillOpen = await page.evaluate(async () => {
@@ -146,6 +143,18 @@ test.describe('Dead End Sweeper', () => {
       return tabs.some((t) => t.title === '500 Internal Server Error');
     });
     expect(stillOpen).toBe(true);
+
+    // Clean up: unpin the tab, close the page handle, then pause
+    // briefly so the extension's service worker settles after the
+    // tab-removal events before the cleanup fixture runs.
+    await page.evaluate(async () => {
+      const tabs = await chrome.tabs.query({ pinned: true });
+      for (const t of tabs) {
+        await chrome.tabs.update(t.id, { pinned: false });
+      }
+    });
+    await pinnedPage.close();
+    await page.waitForTimeout(200);
   });
 
   test('whitelisted domains are excluded from sweeping', async ({ context, extensionId }) => {
